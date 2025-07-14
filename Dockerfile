@@ -9,7 +9,7 @@ COPY --from=denoland/deno:bin-2.2.6 /deno /usr/local/bin/deno
 
 # The port that your application listens to.
 # Bedrock Configuration
-ENV BEDROCK_MODEL_ID=''
+ENV BEDROCK_MODEL_ID='anthropic.claude-3-sonnet-20240229-v1:0'
 ENV BEDROCK_KNOWLEDGE_BASE_ID=''
 ENV BEDROCK_DATA_SOURCE_ID=''
 ENV AWS_REGION=''

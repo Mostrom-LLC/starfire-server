@@ -39,11 +39,12 @@ BEDROCK_DATA_SOURCE_ID=your-data-source-id
 S3_BUCKET_NAME=your-s3-bucket-name
 
 # DynamoDB Configuration
-DYNAMODB_DOCUMENTS_TABLE=your-documents-table
-DYNAMODB_CHAT_HISTORY_TABLE=your-chat-history-table
-DYNAMODB_DYNAMODB_VISUALIZATIONS_TABLE=your-visualizations-table
+DYNAMODB_CHATS_TABLE=your-chats-table
+DYNAMODB_S3_TABLE=your-s3-metadata-table
+DYNAMODB_VISUALIZATIONS_TABLE=your-visualizations-table
 
 # API Configuration
+NODE_ENV=local
 PORT=8000
 API_KEY=your-api-key
 
@@ -193,7 +194,7 @@ The `/api/query-v2` endpoint uses LangChain with DynamoDB memory and Ably for re
 Add these to your `.env` file:
 
 ```env
-DYNAMODB_CHATS_TABLE=langchain
+DYNAMODB_CHATS_TABLE=starfire-rag-agent
 ABLY_API_KEY=your-ably-api-key
 ```
 

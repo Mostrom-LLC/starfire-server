@@ -4,7 +4,7 @@ import { Request, Response, NextFunction } from "express";
  * Middleware to check for API KEY in the request headers
  */
 export const checkApiKey = (req: Request, res: Response, next: NextFunction) => {
-    const APIKEY = Deno.env.get("APIKEY"); // Your API Key from environment variables
+    const APIKEY = Deno.env.get("API_KEY"); // Your API Key from environment variables
 
 
     const apiKeyHeader = req.headers["api-key"] as string | undefined;

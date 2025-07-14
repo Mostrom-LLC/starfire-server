@@ -97,8 +97,8 @@ The Bedrock Agent is a conversational AI agent that provides real-time streaming
 Required environment variables:
 - `AWS_REGION`: AWS region (default: us-east-1)
 - `BEDROCK_MODEL_ID`: Bedrock model ID (default: anthropic.claude-3-5-sonnet-20240620-v1:0)
-- `DYNAMODB_TABLE_NAME`: DynamoDB table for chat history (default: langchain)
-- `STRANDS_KNOWLEDGE_BASE_ID`: Bedrock knowledge base ID
+- `DYNAMODB_CHATS_TABLE`: DynamoDB table for chat history (default: langchain)
+- `BEDROCK_KNOWLEDGE_BASE_ID`: Bedrock knowledge base ID
 
 ### Processing Flow
 1. **WebSocket Connection**: Client connects to `/ws/query`

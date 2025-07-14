@@ -12,11 +12,17 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 
 import { Document } from "@langchain/core/documents";
 
+// Environment variables
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
+const dynamodbChatsTable = Deno.env.get("DYNAMODB_CHATS_TABLE") || "langchain";
+
 const router = Router();
 
 // Initialize Bedrock client
 const bedrockClient = new BedrockAgentRuntimeClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 
@@ -25,7 +31,7 @@ const bedrockClient = new BedrockAgentRuntimeClient({
 export const setupWebSocketRoutes = (app: Application & { ws: (path: string, handler: (ws: WebSocket, req: Request) => void) => void }) => {
 
 
-  // WebSocket endpoint for v3 with LangChain + DynamoDB (no Ably)
+  // WebSocket endpoint for v3 with LangChain + DynamoDB
   app.ws("/ws/query", (ws: WebSocket, _req: Request) => {
     console.log("WebSocket v3 connection opened");
 
@@ -86,26 +92,26 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
         console.log(`⚡ [v3] Initializing components...`);
 
         const chatHistory = new DynamoDBChatMessageHistory({
-          tableName: Deno.env.get("DYNAMODB_TABLE_NAME") || "langchain",
+          tableName: dynamodbChatsTable,
           partitionKey: "id",
           sessionId,
           config: {
-            region: Deno.env.get("AWS_REGION") || "us-east-1"
+            region: awsRegion
           },
         });
 
         // Initialize ChatBedrockConverse without streaming to avoid HTTP/2 conflicts
         const llm = new ChatBedrockConverse({
-          model: Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0",
-          region: Deno.env.get("AWS_REGION") || "us-east-1",
+          model: bedrockModelId,
+          region: awsRegion,
           streaming: false,
         });
 
         // Initialize Knowledge Base retriever
         const retriever = new AmazonKnowledgeBaseRetriever({
           topK: 3,
-          knowledgeBaseId: Deno.env.get("STRANDS_KNOWLEDGE_BASE_ID") || "",
-          region: Deno.env.get("AWS_REGION") || "us-east-1",
+          knowledgeBaseId,
+          region: awsRegion,
         });
 
         // Create history-aware retriever
@@ -188,8 +194,8 @@ User question: ${query}`;
           retrieveAndGenerateConfiguration: {
             type: "KNOWLEDGE_BASE",
             knowledgeBaseConfiguration: {
-              knowledgeBaseId: Deno.env.get("STRANDS_KNOWLEDGE_BASE_ID"),
-              modelArn: `arn:aws:bedrock:${Deno.env.get("AWS_REGION")}::foundation-model/${Deno.env.get("BEDROCK_MODEL_ID")}`,
+              knowledgeBaseId,
+              modelArn: `arn:aws:bedrock:${awsRegion}::foundation-model/${bedrockModelId}`,
             },
           },
         });

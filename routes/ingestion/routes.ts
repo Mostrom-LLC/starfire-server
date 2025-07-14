@@ -10,6 +10,14 @@ import { checkApiKey } from "../../lib/check-api-key.ts";
 
 const router = Router();
 
+// Environment variables
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
+const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID") || "";
+const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const dynamodbS3Table = Deno.env.get("DYNAMODB_S3_TABLE") || "";
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -24,19 +32,17 @@ const upload = multer({
 
 // Initialize AWS clients
 const s3Client = new S3Client({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const dynamoClient = new DynamoDBClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const bedrockAgentClient = new BedrockAgentClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
-const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
-const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
 // Initialize LLM for analysis
 const llm = new ChatBedrockConverse({
   model: bedrockModelId,
@@ -46,9 +52,6 @@ const llm = new ChatBedrockConverse({
 
 // Async function to trigger knowledge base sync (non-blocking)
 async function triggerKnowledgeBaseSync(batchInfo: string): Promise<void> {
-  const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID");
-  const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID");
-
   if (!knowledgeBaseId || !dataSourceId) {
     console.warn("⚠️ [ingestion] Knowledge base sync skipped - missing BEDROCK_KNOWLEDGE_BASE_ID or BEDROCK_DATA_SOURCE_ID");
     return;
@@ -137,7 +140,7 @@ router.post("/api/ingest", (req: Request, res: Response) => {
             console.log(`☁️ [ingestion] Uploading file ${i + 1} to S3...`);
 
             const uploadCommand = new PutObjectCommand({
-              Bucket: Deno.env.get("S3_BUCKET_NAME"),
+              Bucket: s3BucketName,
               Key: s3Key,
               Body: file.buffer,
               ContentType: file.mimetype,
@@ -281,7 +284,7 @@ The goal is to create meaningful context that supports real-time business intell
               data_classification: analysisData.data_classification,
               upload_timestamp: timestamp,
               s3_key: s3Key,
-              s3_bucket: Deno.env.get("S3_BUCKET_NAME") || "",
+              s3_bucket: s3BucketName,
               content_type: file.mimetype,
               last_modified: timestamp,
             };
@@ -314,7 +317,7 @@ The goal is to create meaningful context that supports real-time business intell
             }
 
             const dbCommand = new PutItemCommand({
-              TableName: Deno.env.get("S3_DYNAMODB_TABLE"),
+              TableName: dynamodbS3Table,
               Item: dynamoItem,
             });
 
@@ -393,7 +396,7 @@ router.get("/api/ingest", checkApiKey, async (req: Request, res: Response) => {
     // This is a simplification - for production with large datasets, you'd want to implement
     // more efficient pagination directly with DynamoDB
     const scanParams: any = {
-      TableName: Deno.env.get("S3_DYNAMODB_TABLE"),
+      TableName: dynamodbS3Table,
     };
 
 
@@ -431,21 +434,21 @@ router.get("/api/ingest", checkApiKey, async (req: Request, res: Response) => {
 
     // Sort by upload timestamp (newest first)
     items.sort((a, b) => new Date(b.upload_timestamp).getTime() - new Date(a.upload_timestamp).getTime());
-    
+
     // Calculate total count (in a real production app, you might want to use a separate count query or cache this)
     const total = items.length;
-    
+
     // Calculate pagination values
     const totalPages = Math.max(1, Math.ceil(total / pageCount));
     const startIndex = (page - 1) * pageCount;
     const endIndex = Math.min(startIndex + pageCount, total);
-    
+
     // Get items for current page
     const pageItems = items.slice(startIndex, endIndex);
-    
+
     // Determine if there are more pages
     const hasMore = page < totalPages;
-    
+
     // Prepare pagination response
     const response: any = {
       data: pageItems,

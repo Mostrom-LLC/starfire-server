@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import {
-  BedrockAgentRuntimeClient,
   // Unused but kept for future implementation
   RetrieveAndGenerateCommand as _RetrieveAndGenerateCommand,
 } from "@aws-sdk/client-bedrock-agent-runtime";
@@ -17,24 +16,28 @@ import { v4 as uuidv4 } from "uuid";
 
 const router = Router();
 
-// Initialize AWS clients
-// Unused but kept for future implementation
-const _bedrockClient = new BedrockAgentRuntimeClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
-});
+// Environment variables
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-sonnet-20240229-v1:0";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
+const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const dynamodbS3Table = Deno.env.get("DYNAMODB_S3_TABLE") || "";
+const dynamodbVisualizationsTable = Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations";
+
+
 
 const dynamoClient = new DynamoDBClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const s3Client = new S3Client({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 // Initialize LLM for analysis
 const llm = new ChatBedrockConverse({
-  model: Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-sonnet-20240229-v1:0",
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  model: bedrockModelId,
+  region: awsRegion,
   streaming: false,
 });
 
@@ -92,24 +95,7 @@ interface PowerPointSlide {
   speakerNotes: string;
 }
 
-// Define the structure for a PowerPoint presentation
-interface PowerPointPresentation {
-  id: string;
-  title: string;
-  subtitle: string;
-  executiveSummary: string;
-  createdAt: string;
-  pptxUrl?: string; // Pre-signed S3 URL to download the PPTX file
-  downloadUrl?: string; // Alias for pptxUrl for API consistency
-  s3Key?: string; // S3 key for the PPTX file
-  slides: PowerPointSlide[]; // Keep for database storage and API access
-  metadata: {
-    documentsAnalyzed: number;
-    filesReferenced: number;
-    slideCount: number;
-    processingTime: number;
-  };
-}
+
 
 /**
  * Generate multiple visualizations from knowledge base data
@@ -132,8 +118,8 @@ router.post("/api/visualize/generate", checkApiKey, async (_req: Request, res: R
     // Initialize Knowledge Base retriever
     const retriever = new AmazonKnowledgeBaseRetriever({
       topK: 20, // Retrieve more documents for comprehensive analysis
-      knowledgeBaseId: Deno.env.get("STRANDS_KNOWLEDGE_BASE_ID") || "",
-      region: Deno.env.get("AWS_REGION") || "us-east-1",
+      knowledgeBaseId,
+      region: awsRegion,
     });
 
     // Use a general query to retrieve a diverse set of documents
@@ -147,7 +133,7 @@ router.post("/api/visualize/generate", checkApiKey, async (_req: Request, res: R
     const metadataStartTime = Date.now();
 
     const scanParams = {
-      TableName: Deno.env.get("S3_DYNAMODB_TABLE"),
+      TableName: dynamodbS3Table,
       Limit: 50, // Limit to recent files
     };
 
@@ -415,7 +401,7 @@ Your deliverables should enable pharmaceutical executives to make strategic comm
       const dbItem = marshall(visualizationSet, { removeUndefinedValues: true });
 
       const putCommand = new PutItemCommand({
-        TableName: Deno.env.get("VISUALIZATIONS_TABLE") || "starfire-visualizations",
+        TableName: dynamodbVisualizationsTable,
         Item: dbItem
       });
 
@@ -463,38 +449,38 @@ Your deliverables should enable pharmaceutical executives to make strategic comm
 router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, res: Response) => {
   const visualizationId = req.params.id;
   const startTime = Date.now();
-  
+
   console.log(`\n📄 [powerpoint] Starting PowerPoint generation for visualization set ${visualizationId} at ${new Date().toISOString()}`);
 
   try {
     // Step 1: Retrieve the existing visualization from DynamoDB
     console.log(`🔍 [powerpoint] Retrieving visualization ${visualizationId}...`);
     const getCommand = new GetItemCommand({
-      TableName: Deno.env.get("VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId })
     });
 
     const result = await dynamoClient.send(getCommand);
-    
+
     if (!result.Item) {
       return res.status(404).json({ error: "Visualization not found" });
     }
-    
+
     const visualizationSet = unmarshall(result.Item) as VisualizationSet;
     console.log(`✅ [powerpoint] Found visualization set: ${visualizationSet.title} with ${visualizationSet.visualizations.length} charts`);
 
     // Step 2: Generate Executive-Ready PowerPoint with Native Charts and Corporate Branding
     console.log(`📊 [powerpoint] Generating executive PowerPoint with native charts for ${visualizationSet.visualizations.length} visualizations...`);
     const pptxStartTime = Date.now();
-    
+
     // Generate a unique presentation ID
     const _presentationId = uuidv4();
-    
+
     // Use dynamic import for PptxGenJS due to Deno compatibility issues
     const PptxGenJSModule = await import("pptxgenjs");
     const PptxGenJS = PptxGenJSModule.default || PptxGenJSModule;
     const pptx = new (PptxGenJS as any)();
-    
+
     // Set presentation properties with corporate branding
     pptx.author = "Starfire AI";
     pptx.company = "Starfire";
@@ -545,7 +531,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
         fill: { color: brandColors.primary },
         line: { width: 0 }
       });
-      
+
       // Slide title in header - adjusted for slide bounds
       slide.addText(title, {
         x: 0.2,
@@ -557,7 +543,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
         color: brandColors.white,
         valign: "middle"
       });
-      
+
       // Company logo area (placeholder) - adjusted position
       slide.addText("STARFIRE", {
         x: 8.2,
@@ -582,7 +568,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
         fill: { color: brandColors.background },
         line: { width: 1, color: brandColors.textLight }
       });
-      
+
       slide.addText("Confidential | Starfire Commercial Intelligence", {
         x: 0.2,
         y: 6.9,
@@ -591,7 +577,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
         fontSize: 8,
         color: brandColors.textLight
       });
-      
+
       if (pageNumber) {
         slide.addText(pageNumber, {
           x: 8.5,
@@ -609,37 +595,37 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Helper function to create custom bar chart using shapes
     const createBarChart = (slide: any, chartData: any, x: number, y: number, w: number, h: number) => {
       if (!chartData || !chartData.labels || !chartData.datasets || !chartData.datasets[0]) return;
-      
+
       const dataset = chartData.datasets[0];
       const values = dataset.data || [];
       const labels = chartData.labels;
       const maxValue = Math.max(...values.filter((v: any) => typeof v === 'number'));
-      
+
       if (maxValue <= 0) return;
-      
+
       const barWidth = (w - 1) / labels.length * 0.7; // 70% width for bars, 30% for spacing
       const barSpacing = (w - 1) / labels.length * 0.3;
       const chartHeight = h - 1; // Leave space for labels
-      
+
       labels.forEach((label: string, index: number) => {
         const value = values[index] || 0;
         const barHeight = (value / maxValue) * chartHeight * 0.8; // 80% of chart height
         const barX = x + index * (barWidth + barSpacing);
         const barY = y + chartHeight - barHeight;
-        
+
         // Draw bar
         slide.addShape("rect", {
           x: barX, y: barY, w: barWidth, h: barHeight,
           fill: { color: index % 2 === 0 ? brandColors.primary : brandColors.secondary },
           line: { width: 1, color: brandColors.white }
         });
-        
+
         // Add value label on top of bar
         slide.addText(value.toLocaleString(), {
           x: barX, y: barY - 0.3, w: barWidth, h: 0.25,
           fontSize: 8, color: brandColors.text, align: "center"
         });
-        
+
         // Add category label at bottom - ensure it fits
         const truncatedLabel = label.length > 10 ? label.substring(0, 10) + '...' : label;
         slide.addText(truncatedLabel, {
@@ -652,37 +638,37 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Helper function to create custom pie chart using shapes
     const createPieChart = (slide: any, chartData: any, x: number, y: number, w: number, h: number) => {
       if (!chartData || !chartData.labels || !chartData.datasets || !chartData.datasets[0]) return;
-      
+
       const dataset = chartData.datasets[0];
       const values = dataset.data || [];
       const labels = chartData.labels;
       const total = values.reduce((sum: number, val: any) => sum + (typeof val === 'number' ? val : 0), 0);
-      
+
       if (total <= 0) return;
-      
+
       const centerX = x + w / 2;
       const centerY = y + h / 2;
       const radius = Math.min(w, h) / 3;
-      
+
       let currentAngle = 0;
       const colors = [brandColors.primary, brandColors.secondary, brandColors.accent, brandColors.success, brandColors.warning];
-      
+
       labels.forEach((label: string, index: number) => {
         const value = values[index] || 0;
         const percentage = (value / total) * 100;
         const angle = (value / total) * 360;
-        
+
         if (percentage > 0 && index < 6) { // Limit to 6 legend items to fit in chart area
           // Create pie slice (simplified as colored rectangles for legend)
           const legendY = y + 0.5 + index * 0.35; // Adjusted spacing
-          
+
           // Legend color box - positioned within chart area
           slide.addShape("rect", {
             x: x + w * 0.6, y: legendY, w: 0.2, h: 0.2,
             fill: { color: colors[index % colors.length] },
             line: { width: 1, color: brandColors.white }
           });
-          
+
           // Legend text - truncated to fit
           const truncatedLabel = label.length > 12 ? label.substring(0, 12) + '...' : label;
           slide.addText(`${truncatedLabel}: ${percentage.toFixed(1)}%`, {
@@ -690,17 +676,17 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
             fontSize: 9, color: brandColors.text
           });
         }
-        
+
         currentAngle += angle;
       });
-      
+
       // Draw main pie circle (simplified)
       slide.addShape("ellipse", {
         x: centerX - radius, y: centerY - radius, w: radius * 2, h: radius * 2,
         fill: { color: brandColors.background },
         line: { width: 2, color: brandColors.primary }
       });
-      
+
       // Add center label
       slide.addText("Pie Chart", {
         x: centerX - 1, y: centerY - 0.15, w: 2, h: 0.3,
@@ -711,19 +697,19 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Helper function to create custom line chart using shapes
     const createLineChart = (slide: any, chartData: any, x: number, y: number, w: number, h: number) => {
       if (!chartData || !chartData.labels || !chartData.datasets || !chartData.datasets[0]) return;
-      
+
       const dataset = chartData.datasets[0];
       const values = dataset.data || [];
       const labels = chartData.labels;
       const maxValue = Math.max(...values.filter((v: any) => typeof v === 'number'));
       const minValue = Math.min(...values.filter((v: any) => typeof v === 'number'));
-      
+
       if (maxValue <= minValue) return;
-      
+
       const chartWidth = w - 1;
       const chartHeight = h - 0.8;
       const pointSpacing = chartWidth / (labels.length - 1);
-      
+
       // Draw trend line using rectangles to simulate line segments
       for (let i = 0; i < values.length - 1; i++) {
         const value1 = values[i] || 0;
@@ -732,13 +718,13 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
         const y2 = y + chartHeight - ((value2 - minValue) / (maxValue - minValue)) * chartHeight;
         const x1 = x + i * pointSpacing;
         const x2 = x + (i + 1) * pointSpacing;
-        
+
         // Draw line segment
         slide.addShape("line", {
           x: x1, y: y1, w: x2 - x1, h: y2 - y1,
           line: { width: 3, color: brandColors.primary }
         });
-        
+
         // Draw data points
         slide.addShape("ellipse", {
           x: x1 - 0.05, y: y1 - 0.05, w: 0.1, h: 0.1,
@@ -746,7 +732,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
           line: { width: 1, color: brandColors.white }
         });
       }
-      
+
       // Labels at bottom - ensure they fit within bounds
       labels.forEach((label: string, index: number) => {
         const truncatedLabel = label.length > 8 ? label.substring(0, 8) + '...' : label;
@@ -760,46 +746,46 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Helper function to create data table
     const createDataTable = (slide: any, chartData: any, x: number, y: number, w: number, h: number) => {
       if (!chartData || !chartData.labels || !chartData.datasets) return;
-      
+
       const labels = chartData.labels;
       const dataset = chartData.datasets[0] || {};
       const values = dataset.data || [];
       const maxRows = Math.min(labels.length, 6); // Limit to 6 rows
       const rowHeight = h / (maxRows + 1); // +1 for header
-      
+
       // Header
       slide.addShape("rect", {
         x: x, y: y, w: w, h: rowHeight,
         fill: { color: brandColors.primary },
         line: { width: 1, color: brandColors.white }
       });
-      
+
       slide.addText("Category", {
         x: x + 0.1, y: y + 0.05, w: w * 0.6 - 0.1, h: rowHeight - 0.1,
         fontSize: 10, bold: true, color: brandColors.white, valign: "middle"
       });
-      
+
       slide.addText("Value", {
         x: x + w * 0.6, y: y + 0.05, w: w * 0.4 - 0.1, h: rowHeight - 0.1,
         fontSize: 10, bold: true, color: brandColors.white, valign: "middle", align: "right"
       });
-      
+
       // Data rows
       for (let i = 0; i < maxRows; i++) {
         const rowY = y + (i + 1) * rowHeight;
         const isEven = i % 2 === 0;
-        
+
         slide.addShape("rect", {
           x: x, y: rowY, w: w, h: rowHeight,
           fill: { color: isEven ? brandColors.white : brandColors.background },
           line: { width: 1, color: brandColors.textLight }
         });
-        
+
         slide.addText(labels[i]?.substring(0, 25) || '', {
           x: x + 0.1, y: rowY + 0.05, w: w * 0.6 - 0.1, h: rowHeight - 0.1,
           fontSize: 9, color: brandColors.text, valign: "middle"
         });
-        
+
         const value = values[i];
         const displayValue = typeof value === 'number' ? value.toLocaleString() : 'N/A';
         slide.addText(displayValue, {
@@ -811,14 +797,14 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
 
     // 1. Executive Title Slide with Corporate Branding
     const titleSlide = pptx.addSlide();
-    
+
     // Full-width brand header - adjusted to fit slide
     titleSlide.addShape("rect", {
       x: 0, y: 0, w: 10, h: 1.2,
       fill: { color: brandColors.primary },
       line: { width: 0 }
     });
-    
+
     // Main title - adjusted width
     titleSlide.addText(visualizationSet.title, {
       x: 0.5, y: 2.5, w: 9, h: 1.5,
@@ -828,7 +814,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
       align: "center",
       fontFace: "Segoe UI"
     });
-    
+
     // Subtitle - adjusted width
     titleSlide.addText("Executive Commercial Intelligence Report", {
       x: 0.5, y: 4, w: 9, h: 0.8,
@@ -837,14 +823,14 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
       align: "center",
       fontFace: "Segoe UI Light"
     });
-    
+
     // Metadata section with visual styling - adjusted dimensions
     titleSlide.addShape("rect", {
       x: 1.5, y: 5, w: 7, h: 1.5,
       fill: { color: brandColors.background },
       line: { width: 1, color: brandColors.textLight }
     });
-    
+
     titleSlide.addText([
       { text: "Analysis Overview", options: { fontSize: 14, bold: true, color: brandColors.text } },
       { text: `\n• Total Visualizations: ${visualizationSet.visualizations.length}`, options: { fontSize: 12, color: brandColors.text } },
@@ -860,14 +846,14 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     if (visualizationSet.summary) {
       const summarySlide = pptx.addSlide();
       addCorporateHeader(summarySlide, "Executive Summary");
-      
+
       // Summary content with professional styling - adjusted dimensions
       summarySlide.addShape("rect", {
         x: 0.5, y: 1.2, w: 9, h: 4.5,
         fill: { color: brandColors.white },
         line: { width: 1, color: brandColors.textLight }
       });
-      
+
       summarySlide.addText(visualizationSet.summary, {
         x: 0.8, y: 1.5, w: 8.4, h: 3.9,
         fontSize: 16,
@@ -875,7 +861,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
         fontFace: "Segoe UI",
         lineSpacing: 24
       });
-      
+
       addCorporateFooter(summarySlide, "2");
     }
 
@@ -883,227 +869,227 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     visualizationSet.visualizations.forEach((chartData, chartIndex) => {
       try {
         console.log(`📊 [powerpoint] Creating native chart slide ${chartIndex + 1}: ${chartData.title}`);
-        
+
         const chartSlide = pptx.addSlide();
         addCorporateHeader(chartSlide, chartData.title || `Chart ${chartIndex + 1}`);
-      
-      // Two-column layout: Chart (left) + Insights/Recommendations (right)
-      // Standard PowerPoint slide is 10" x 7.5" - adjust dimensions to fit
-      const leftColumnWidth = 5.8;  // Reduced from 7.5
-      const rightColumnWidth = 3.7;  // Reduced from 5.3
-      const leftColumnX = 0.3;       // Moved inward
-      const rightColumnX = leftColumnX + leftColumnWidth + 0.2;
-      
-      // LEFT COLUMN: Custom Chart Visualization using Shapes
-      if (chartData.chartData && chartData.chartData.labels && chartData.chartData.datasets) {
-        try {
-          console.log(`[powerpoint] Creating custom ${chartData.chartType} chart with visual elements`);
-          
-          // Chart container with border - adjusted height to fit slide
-          chartSlide.addShape("rect", {
-            x: leftColumnX, y: 1.5, w: leftColumnWidth, h: 4.0,
-            fill: { color: brandColors.white },
-            line: { width: 2, color: brandColors.primary }
-          });
-          
-          // Chart title
-          chartSlide.addText(chartData.description || `${chartData.chartType.toUpperCase()} Chart`, {
-            x: leftColumnX + 0.1, y: 1.6, w: leftColumnWidth - 0.2, h: 0.4,
-            fontSize: 12, bold: true, color: brandColors.text, align: "center"
-          });
-          
-          // Create chart based on type - adjusted dimensions
-          const chartAreaX = leftColumnX + 0.2;
-          const chartAreaY = 2.1;
-          const chartAreaW = leftColumnWidth - 0.4;
-          const chartAreaH = 3.0;
-          
-          switch (chartData.chartType.toLowerCase()) {
-            case 'bar':
-            case 'column':
-              createBarChart(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW, chartAreaH);
-              break;
-            case 'pie':
-              createPieChart(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW * 0.6, chartAreaH);
-              break;
-            case 'line':
-              createLineChart(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW, chartAreaH);
-              break;
-            default:
-              // For radar, scatter, or unknown types, show data table
-              createDataTable(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW, chartAreaH);
-              break;
+
+        // Two-column layout: Chart (left) + Insights/Recommendations (right)
+        // Standard PowerPoint slide is 10" x 7.5" - adjust dimensions to fit
+        const leftColumnWidth = 5.8;  // Reduced from 7.5
+        const rightColumnWidth = 3.7;  // Reduced from 5.3
+        const leftColumnX = 0.3;       // Moved inward
+        const rightColumnX = leftColumnX + leftColumnWidth + 0.2;
+
+        // LEFT COLUMN: Custom Chart Visualization using Shapes
+        if (chartData.chartData && chartData.chartData.labels && chartData.chartData.datasets) {
+          try {
+            console.log(`[powerpoint] Creating custom ${chartData.chartType} chart with visual elements`);
+
+            // Chart container with border - adjusted height to fit slide
+            chartSlide.addShape("rect", {
+              x: leftColumnX, y: 1.5, w: leftColumnWidth, h: 4.0,
+              fill: { color: brandColors.white },
+              line: { width: 2, color: brandColors.primary }
+            });
+
+            // Chart title
+            chartSlide.addText(chartData.description || `${chartData.chartType.toUpperCase()} Chart`, {
+              x: leftColumnX + 0.1, y: 1.6, w: leftColumnWidth - 0.2, h: 0.4,
+              fontSize: 12, bold: true, color: brandColors.text, align: "center"
+            });
+
+            // Create chart based on type - adjusted dimensions
+            const chartAreaX = leftColumnX + 0.2;
+            const chartAreaY = 2.1;
+            const chartAreaW = leftColumnWidth - 0.4;
+            const chartAreaH = 3.0;
+
+            switch (chartData.chartType.toLowerCase()) {
+              case 'bar':
+              case 'column':
+                createBarChart(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW, chartAreaH);
+                break;
+              case 'pie':
+                createPieChart(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW * 0.6, chartAreaH);
+                break;
+              case 'line':
+                createLineChart(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW, chartAreaH);
+                break;
+              default:
+                // For radar, scatter, or unknown types, show data table
+                createDataTable(chartSlide, chartData.chartData, chartAreaX, chartAreaY, chartAreaW, chartAreaH);
+                break;
+            }
+
+          } catch (chartError) {
+            console.error(`[powerpoint] Error creating custom chart:`, chartError);
+
+            // Fallback to data table - adjusted height
+            chartSlide.addShape("rect", {
+              x: leftColumnX, y: 1.5, w: leftColumnWidth, h: 4.0,
+              fill: { color: brandColors.background },
+              line: { width: 1, color: brandColors.warning }
+            });
+
+            chartSlide.addText(`${chartData.chartType.toUpperCase()} Data`, {
+              x: leftColumnX, y: 2, w: leftColumnWidth, h: 0.5,
+              fontSize: 14, bold: true, color: brandColors.text, align: "center"
+            });
+
+            if (chartData.chartData) {
+              createDataTable(chartSlide, chartData.chartData, leftColumnX + 0.2, 2.7, leftColumnWidth - 0.4, 3);
+            }
           }
-          
-        } catch (chartError) {
-          console.error(`[powerpoint] Error creating custom chart:`, chartError);
-          
-          // Fallback to data table - adjusted height
+        } else {
+          console.warn(`[powerpoint] No valid chart data for ${chartData.title}`);
+
+          // Fallback for missing chart data - adjusted height
           chartSlide.addShape("rect", {
             x: leftColumnX, y: 1.5, w: leftColumnWidth, h: 4.0,
             fill: { color: brandColors.background },
-            line: { width: 1, color: brandColors.warning }
+            line: { width: 1, color: brandColors.textLight }
           });
-          
-          chartSlide.addText(`${chartData.chartType.toUpperCase()} Data`, {
-            x: leftColumnX, y: 2, w: leftColumnWidth, h: 0.5,
-            fontSize: 14, bold: true, color: brandColors.text, align: "center"
+
+          chartSlide.addText("No Chart Data Available", {
+            x: leftColumnX, y: 3, w: leftColumnWidth, h: 0.5,
+            fontSize: 16, bold: true, color: brandColors.textLight, align: "center"
           });
-          
-          if (chartData.chartData) {
-            createDataTable(chartSlide, chartData.chartData, leftColumnX + 0.2, 2.7, leftColumnWidth - 0.4, 3);
-          }
+
+          chartSlide.addText(chartData.description || "Data visualization could not be generated", {
+            x: leftColumnX, y: 3.8, w: leftColumnWidth, h: 1,
+            fontSize: 12, color: brandColors.textLight, align: "center"
+          });
         }
-      } else {
-        console.warn(`[powerpoint] No valid chart data for ${chartData.title}`);
-        
-        // Fallback for missing chart data - adjusted height
-        chartSlide.addShape("rect", {
-          x: leftColumnX, y: 1.5, w: leftColumnWidth, h: 4.0,
-          fill: { color: brandColors.background },
-          line: { width: 1, color: brandColors.textLight }
-        });
-        
-        chartSlide.addText("No Chart Data Available", {
-          x: leftColumnX, y: 3, w: leftColumnWidth, h: 0.5,
-          fontSize: 16, bold: true, color: brandColors.textLight, align: "center"
-        });
-        
-        chartSlide.addText(chartData.description || "Data visualization could not be generated", {
-          x: leftColumnX, y: 3.8, w: leftColumnWidth, h: 1,
-          fontSize: 12, color: brandColors.textLight, align: "center"
-        });
-      }
-      
-      // RIGHT COLUMN: Insights and Recommendations Sidebar
-      let rightColumnY = 1.5;
-      
-      // Insights section
-      if (chartData.insights && chartData.insights.length > 0) {
-        // Insights header
-        chartSlide.addShape("rect", {
-          x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: 0.5,
-          fill: { color: brandColors.primary },
-          line: { width: 0 }
-        });
-        
-        chartSlide.addText("Key Insights", {
-          x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: 0.3,
-          fontSize: 12,
-          bold: true,
-          color: brandColors.white
-        });
-        
-        rightColumnY += 0.6;
-        
-        // Insights content - limit height to fit within slide
-        const availableHeight = 6.5 - rightColumnY; // Account for footer space
-        const insightsHeight = Math.min(1.8, Math.min(availableHeight * 0.45, chartData.insights.length * 0.35 + 0.3));
-        chartSlide.addShape("rect", {
-          x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: insightsHeight,
-          fill: { color: brandColors.white },
-          line: { width: 1, color: brandColors.primary }
-        });
-        
-        // Truncate insights to fit available space
-        const maxInsights = Math.floor((insightsHeight - 0.3) / 0.3);
-        const displayInsights = chartData.insights.slice(0, maxInsights);
-        const insightsText = displayInsights.map((insight: string) => {
-          const truncated = insight.length > 50 ? insight.substring(0, 50) + '...' : insight;
-          return `• ${truncated}`;
-        }).join('\n');
-        
-        chartSlide.addText(insightsText, {
-          x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: insightsHeight - 0.2,
-          fontSize: 9,
-          color: brandColors.text,
-          fontFace: "Segoe UI"
-        });
-        
-        rightColumnY += insightsHeight + 0.3;
-      }
-      
-      // Recommendations section
-      if (chartData.recommendations && chartData.recommendations.length > 0) {
-        // Recommendations header
-        chartSlide.addShape("rect", {
-          x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: 0.5,
-          fill: { color: brandColors.secondary },
-          line: { width: 0 }
-        });
-        
-        chartSlide.addText("Recommendations", {
-          x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: 0.3,
-          fontSize: 12,
-          bold: true,
-          color: brandColors.white
-        });
-        
-        rightColumnY += 0.6;
-        
-        // Recommendations content - limit height to remaining space
-        const remainingHeight = 6.5 - rightColumnY;
-        const recommendationsHeight = Math.min(1.8, Math.min(remainingHeight - 0.2, chartData.recommendations.length * 0.35 + 0.3));
-        chartSlide.addShape("rect", {
-          x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: recommendationsHeight,
-          fill: { color: brandColors.white },
-          line: { width: 1, color: brandColors.secondary }
-        });
-        
-        // Truncate recommendations to fit available space
-        const maxRecommendations = Math.floor((recommendationsHeight - 0.3) / 0.3);
-        const displayRecommendations = chartData.recommendations.slice(0, maxRecommendations);
-        const recommendationsText = displayRecommendations.map((rec: string) => {
-          const truncated = rec.length > 50 ? rec.substring(0, 50) + '...' : rec;
-          return `→ ${truncated}`;
-        }).join('\n');
-        
-        chartSlide.addText(recommendationsText, {
-          x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: recommendationsHeight - 0.2,
-          fontSize: 9,
-          color: brandColors.text,
-          fontFace: "Segoe UI"
-        });
-      }
-      
+
+        // RIGHT COLUMN: Insights and Recommendations Sidebar
+        let rightColumnY = 1.5;
+
+        // Insights section
+        if (chartData.insights && chartData.insights.length > 0) {
+          // Insights header
+          chartSlide.addShape("rect", {
+            x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: 0.5,
+            fill: { color: brandColors.primary },
+            line: { width: 0 }
+          });
+
+          chartSlide.addText("Key Insights", {
+            x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: 0.3,
+            fontSize: 12,
+            bold: true,
+            color: brandColors.white
+          });
+
+          rightColumnY += 0.6;
+
+          // Insights content - limit height to fit within slide
+          const availableHeight = 6.5 - rightColumnY; // Account for footer space
+          const insightsHeight = Math.min(1.8, Math.min(availableHeight * 0.45, chartData.insights.length * 0.35 + 0.3));
+          chartSlide.addShape("rect", {
+            x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: insightsHeight,
+            fill: { color: brandColors.white },
+            line: { width: 1, color: brandColors.primary }
+          });
+
+          // Truncate insights to fit available space
+          const maxInsights = Math.floor((insightsHeight - 0.3) / 0.3);
+          const displayInsights = chartData.insights.slice(0, maxInsights);
+          const insightsText = displayInsights.map((insight: string) => {
+            const truncated = insight.length > 50 ? insight.substring(0, 50) + '...' : insight;
+            return `• ${truncated}`;
+          }).join('\n');
+
+          chartSlide.addText(insightsText, {
+            x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: insightsHeight - 0.2,
+            fontSize: 9,
+            color: brandColors.text,
+            fontFace: "Segoe UI"
+          });
+
+          rightColumnY += insightsHeight + 0.3;
+        }
+
+        // Recommendations section
+        if (chartData.recommendations && chartData.recommendations.length > 0) {
+          // Recommendations header
+          chartSlide.addShape("rect", {
+            x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: 0.5,
+            fill: { color: brandColors.secondary },
+            line: { width: 0 }
+          });
+
+          chartSlide.addText("Recommendations", {
+            x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: 0.3,
+            fontSize: 12,
+            bold: true,
+            color: brandColors.white
+          });
+
+          rightColumnY += 0.6;
+
+          // Recommendations content - limit height to remaining space
+          const remainingHeight = 6.5 - rightColumnY;
+          const recommendationsHeight = Math.min(1.8, Math.min(remainingHeight - 0.2, chartData.recommendations.length * 0.35 + 0.3));
+          chartSlide.addShape("rect", {
+            x: rightColumnX, y: rightColumnY, w: rightColumnWidth, h: recommendationsHeight,
+            fill: { color: brandColors.white },
+            line: { width: 1, color: brandColors.secondary }
+          });
+
+          // Truncate recommendations to fit available space
+          const maxRecommendations = Math.floor((recommendationsHeight - 0.3) / 0.3);
+          const displayRecommendations = chartData.recommendations.slice(0, maxRecommendations);
+          const recommendationsText = displayRecommendations.map((rec: string) => {
+            const truncated = rec.length > 50 ? rec.substring(0, 50) + '...' : rec;
+            return `→ ${truncated}`;
+          }).join('\n');
+
+          chartSlide.addText(recommendationsText, {
+            x: rightColumnX + 0.1, y: rightColumnY + 0.1, w: rightColumnWidth - 0.2, h: recommendationsHeight - 0.2,
+            fontSize: 9,
+            color: brandColors.text,
+            fontFace: "Segoe UI"
+          });
+        }
+
         addCorporateFooter(chartSlide, `${chartIndex + 3}`);
-        
+
       } catch (slideError) {
         console.error(`[powerpoint] Error creating slide ${chartIndex + 1}:`, slideError);
-        
+
         // Create a basic error slide
         const errorSlide = pptx.addSlide();
         addCorporateHeader(errorSlide, `Chart ${chartIndex + 1} - Error`);
-        
+
         errorSlide.addText("Unable to generate chart slide", {
           x: 1, y: 3, w: 11.33, h: 1,
           fontSize: 16,
           color: brandColors.warning,
           align: "center"
         });
-        
+
         errorSlide.addText(chartData.title || `Chart ${chartIndex + 1}`, {
           x: 1, y: 4, w: 11.33, h: 0.5,
           fontSize: 12,
           color: brandColors.text,
           align: "center"
         });
-        
+
         addCorporateFooter(errorSlide, `${chartIndex + 3}`);
       }
     });
-    
+
     // 4. Executive Summary and Next Steps Slide
     const finalSlide = pptx.addSlide();
     addCorporateHeader(finalSlide, "Summary & Next Steps");
-    
+
     // Summary metrics with visual styling
     finalSlide.addShape("rect", {
       x: 1, y: 1.5, w: 11.33, h: 2.5,
       fill: { color: brandColors.background },
       line: { width: 1, color: brandColors.textLight }
     });
-    
+
     finalSlide.addText([
       { text: "Analysis Complete", options: { fontSize: 18, bold: true, color: brandColors.primary } },
       { text: `\n\n✓ ${visualizationSet.visualizations.length} visualizations analyzed`, options: { fontSize: 14, color: brandColors.success } },
@@ -1112,14 +1098,14 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     ], {
       x: 1.5, y: 2, w: 10.33, h: 1.5
     });
-    
+
     // Next steps section
     finalSlide.addShape("rect", {
       x: 1, y: 4.5, w: 11.33, h: 2,
       fill: { color: brandColors.white },
       line: { width: 1, color: brandColors.secondary }
     });
-    
+
     finalSlide.addText([
       { text: "Recommended Next Steps", options: { fontSize: 16, bold: true, color: brandColors.secondary } },
       { text: "\n→ Review insights with commercial leadership team", options: { fontSize: 12, color: brandColors.text } },
@@ -1128,9 +1114,9 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     ], {
       x: 1.5, y: 5, w: 10.33, h: 1.5
     });
-    
+
     addCorporateFooter(finalSlide, `${visualizationSet.visualizations.length + 3}`);
-    
+
     // Generate PPTX buffer with error handling
     let pptxBuffer: ArrayBuffer;
     try {
@@ -1140,30 +1126,30 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
       console.log(`✅ [powerpoint] PowerPoint generated in ${pptxEndTime - pptxStartTime}ms`);
     } catch (pptxError) {
       console.error(`❌ [powerpoint] Error generating PPTX file:`, pptxError);
-      
+
       // Create a minimal fallback presentation
       console.log(`🔄 [powerpoint] Creating fallback presentation...`);
       const fallbackPptx = new (PptxGenJS as any)();
       fallbackPptx.author = "Starfire AI";
       fallbackPptx.company = "Starfire";
       fallbackPptx.title = visualizationSet.title;
-      
+
       const fallbackSlide = fallbackPptx.addSlide();
       fallbackSlide.addText(visualizationSet.title, {
         x: 1, y: 2, w: 11.33, h: 1,
         fontSize: 24, bold: true, color: "2E86AB", align: "center"
       });
-      
+
       fallbackSlide.addText("PowerPoint Generation Error", {
         x: 1, y: 3.5, w: 11.33, h: 1,
         fontSize: 16, color: "E67E22", align: "center"
       });
-      
+
       fallbackSlide.addText(`${visualizationSet.visualizations.length} visualizations were analyzed but could not be rendered as charts.`, {
         x: 1, y: 5, w: 11.33, h: 1,
         fontSize: 12, color: "333333", align: "center"
       });
-      
+
       pptxBuffer = await fallbackPptx.write('arraybuffer') as ArrayBuffer;
       console.log(`✅ [powerpoint] Fallback presentation generated`);
     }
@@ -1171,13 +1157,13 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Step 3: Upload PowerPoint to S3
     console.log(`☁️ [powerpoint] Uploading PowerPoint to S3...`);
     const uploadStartTime = Date.now();
-    
+
     const timestamp = new Date().toISOString();
     const fileName = `${visualizationSet.title.replace(/[^a-zA-Z0-9]/g, '_')}_${visualizationId}_presentation.pptx`;
     const s3Key = `visualizations/powerpoint/${timestamp.split('T')[0]}/${fileName}`;
-    
+
     const uploadCommand = new PutObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
       Body: new Uint8Array(pptxBuffer),
       ContentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -1196,12 +1182,12 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Step 4: Generate pre-signed URL
     console.log(`🔐 [powerpoint] Generating pre-signed URL...`);
     const presignedStartTime = Date.now();
-    
+
     const getObjectCommand = new GetObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
     });
-    
+
     // Generate pre-signed URL that expires in 24 hours
     const pptxUrl = await getSignedUrl(s3Client, getObjectCommand, { expiresIn: 86400 });
     const presignedEndTime = Date.now();
@@ -1245,36 +1231,36 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
 router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Response) => {
   const visualizationId = req.params.id;
   const startTime = Date.now();
-  
+
   console.log(`\n📄 [pdf] Starting PDF generation for visualization set ${visualizationId} at ${new Date().toISOString()}`);
 
   try {
     // Step 1: Retrieve the existing visualization from DynamoDB
     console.log(`🔍 [pdf] Retrieving visualization ${visualizationId}...`);
     const getCommand = new GetItemCommand({
-      TableName: Deno.env.get("VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId })
     });
 
     const result = await dynamoClient.send(getCommand);
-    
+
     if (!result.Item) {
       return res.status(404).json({ error: "Visualization not found" });
     }
-    
+
     const visualizationSet = unmarshall(result.Item) as VisualizationSet;
     console.log(`✅ [pdf] Found visualization set: ${visualizationSet.title} with ${visualizationSet.visualizations.length} charts`);
 
     // Step 2: Generate structured HTML content for each chart
     console.log(`📊 [pdf] Generating HTML content for ${visualizationSet.visualizations.length} charts...`);
     const htmlStartTime = Date.now();
-    
+
     // Helper function to generate chart data table HTML
     const generateChartDataTable = (chartData: any) => {
       if (!chartData.chartData || !chartData.chartData.labels || !chartData.chartData.datasets) {
         return '<p class="no-data">No chart data available</p>';
       }
-      
+
       let tableHtml = `
         <table class="chart-data-table">
           <thead>
@@ -1285,13 +1271,13 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
           </thead>
           <tbody>
       `;
-      
+
       chartData.chartData.labels.forEach((label: string, index: number) => {
         const values = chartData.chartData.datasets.map((dataset: any) => {
           const value = Array.isArray(dataset.data) ? dataset.data[index] : 'N/A';
           return typeof value === 'number' ? value.toLocaleString() : value;
         }).join(', ');
-        
+
         tableHtml += `
           <tr>
             <td class="category">${label}</td>
@@ -1299,12 +1285,12 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
           </tr>
         `;
       });
-      
+
       tableHtml += `
           </tbody>
         </table>
       `;
-      
+
       return tableHtml;
     };
 
@@ -1520,7 +1506,7 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     // Generate chart pages HTML
     const chartPagesHtml = visualizationSet.visualizations.map((chartData: any, chartIndex: number) => {
       console.log(`📄 [pdf] Processing chart ${chartIndex + 1}: ${chartData.title}`);
-      
+
       return `
         <div class="page chart-page">
           <h2 class="chart-title">${chartData.title}</h2>
@@ -1602,13 +1588,13 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     // Step 3: Generate PDF from HTML using Puppeteer (server-friendly approach)
     console.log(`📄 [pdf] Converting HTML to PDF using Puppeteer...`);
     const pdfStartTime = Date.now();
-    
+
     let pdfBuffer: Uint8Array;
-    
+
     try {
       // Use dynamic import for Puppeteer
       const puppeteer = await import("npm:puppeteer@^23.8.0");
-      
+
       // Launch browser with appropriate flags for server environment
       const browser = await puppeteer.default.launch({
         headless: true,
@@ -1623,15 +1609,15 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
           '--disable-gpu'
         ]
       });
-      
+
       const page = await browser.newPage();
-      
+
       // Set viewport for consistent rendering
       await page.setViewport({ width: 1200, height: 800 });
-      
+
       // Set content and wait for rendering
       await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
-      
+
       // Generate PDF with high-quality settings
       const pdfArrayBuffer = await page.pdf({
         format: 'A4',
@@ -1645,27 +1631,27 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
         preferCSSPageSize: true,
         displayHeaderFooter: false
       });
-      
+
       await browser.close();
-      
+
       // Convert ArrayBuffer to Uint8Array
       pdfBuffer = new Uint8Array(pdfArrayBuffer);
-      
+
       const pdfEndTime = Date.now();
       console.log(`✅ [pdf] PDF generated using Puppeteer in ${pdfEndTime - pdfStartTime}ms`);
-      
+
     } catch (puppeteerError) {
       console.warn(`⚠️ [pdf] Puppeteer failed, falling back to jsPDF basic text rendering:`, puppeteerError);
-      
+
       // Fallback to basic jsPDF text rendering if Puppeteer fails
       const { jsPDF } = await import("jspdf");
-      
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
-      
+
       // Add cover page with basic text
       pdf.setFontSize(20);
       pdf.text(visualizationSet.title, 20, 30);
@@ -1674,25 +1660,25 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
       pdf.setFontSize(10);
       pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 70);
       pdf.text(`Total Charts: ${visualizationSet.visualizations.length}`, 20, 80);
-      
+
       // Add basic chart information
       visualizationSet.visualizations.forEach((chartData: any, index: number) => {
         pdf.addPage();
         pdf.setFontSize(16);
         pdf.text(chartData.title, 20, 30);
-        
+
         if (chartData.description) {
           pdf.setFontSize(12);
           const lines = pdf.splitTextToSize(chartData.description, 170);
           pdf.text(lines, 20, 50);
         }
-        
+
         pdf.setFontSize(10);
         pdf.text(`Chart ${index + 1} of ${visualizationSet.visualizations.length}`, 20, 280);
       });
-      
+
       pdfBuffer = new Uint8Array(pdf.output('arraybuffer') as ArrayBuffer);
-      
+
       const pdfEndTime = Date.now();
       console.log(`✅ [pdf] Fallback PDF generated in ${pdfEndTime - pdfStartTime}ms`);
     }
@@ -1700,13 +1686,13 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     // Step 4: Upload PDF to S3
     console.log(`☁️ [pdf] Uploading PDF to S3...`);
     const uploadStartTime = Date.now();
-    
+
     const timestamp = new Date().toISOString();
     const fileName = `${visualizationSet.title.replace(/[^a-zA-Z0-9]/g, '_')}_${visualizationId}_complete.pdf`;
     const s3Key = `visualizations/pdf/${timestamp.split('T')[0]}/${fileName}`;
-    
+
     const uploadCommand = new PutObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
       Body: pdfBuffer,
       ContentType: "application/pdf",
@@ -1725,12 +1711,12 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     // Step 5: Generate pre-signed URL
     console.log(`🔐 [pdf] Generating pre-signed URL...`);
     const presignedStartTime = Date.now();
-    
+
     const getObjectCommand = new GetObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
     });
-    
+
     // Generate pre-signed URL that expires in 24 hours
     const pdfUrl = await getSignedUrl(s3Client, getObjectCommand, { expiresIn: 86400 });
     const presignedEndTime = Date.now();
@@ -1777,7 +1763,7 @@ router.get("/api/visualize/:id", checkApiKey, async (req: Request, res: Response
   try {
     // Get visualization from DynamoDB
     const getCommand = new GetItemCommand({
-      TableName: Deno.env.get("VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId })
     });
 
@@ -1820,7 +1806,7 @@ router.delete("/api/visualize/:id", checkApiKey, async (req: Request, res: Respo
   try {
     // Delete visualization from DynamoDB
     const deleteCommand = new DeleteItemCommand({
-      TableName: Deno.env.get("VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId }),
       ReturnValues: "ALL_OLD"
     });
@@ -1869,7 +1855,7 @@ router.get("/api/visualize", checkApiKey, async (_req: Request, res: Response) =
   try {
     // Scan DynamoDB for all visualization sets
     const scanCommand = new ScanCommand({
-      TableName: Deno.env.get("VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       ProjectionExpression: "id, title, summary, createdAt, #md, visualizations[0].chartType",
       ExpressionAttributeNames: {
         "#md": "metadata"

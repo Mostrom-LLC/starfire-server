@@ -12,11 +12,17 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 
 import { Document } from "@langchain/core/documents";
 
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
+const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID") || "";
+
 const router = Router();
 
 // Initialize Bedrock client
 const bedrockClient = new BedrockAgentRuntimeClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 
@@ -96,16 +102,16 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
 
         // Initialize ChatBedrockConverse without streaming to avoid HTTP/2 conflicts
         const llm = new ChatBedrockConverse({
-          model: Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0",
-          region: Deno.env.get("AWS_REGION") || "us-east-1",
+          model: bedrockModelId,
+          region: awsRegion,
           streaming: false,
         });
 
         // Initialize Knowledge Base retriever
         const retriever = new AmazonKnowledgeBaseRetriever({
           topK: 3,
-          knowledgeBaseId: Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "",
-          region: Deno.env.get("AWS_REGION") || "us-east-1",
+          knowledgeBaseId,
+          region: awsRegion,
         });
 
         // Create history-aware retriever
@@ -188,8 +194,8 @@ User question: ${query}`;
           retrieveAndGenerateConfiguration: {
             type: "KNOWLEDGE_BASE",
             knowledgeBaseConfiguration: {
-              knowledgeBaseId: Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID"),
-              modelArn: `arn:aws:bedrock:${Deno.env.get("AWS_REGION")}::foundation-model/${Deno.env.get("BEDROCK_MODEL_ID")}`,
+              knowledgeBaseId,
+              modelArn: `arn:aws:bedrock:${awsRegion}::foundation-model/${bedrockModelId}`,
             },
           },
         });

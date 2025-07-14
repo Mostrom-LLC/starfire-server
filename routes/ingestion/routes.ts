@@ -22,21 +22,27 @@ const upload = multer({
   },
 });
 
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID");
+const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID");
+
 // Initialize AWS clients
 const s3Client = new S3Client({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const dynamoClient = new DynamoDBClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const bedrockAgentClient = new BedrockAgentClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
-const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
-const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+
+
 // Initialize LLM for analysis
 const llm = new ChatBedrockConverse({
   model: bedrockModelId,
@@ -46,8 +52,7 @@ const llm = new ChatBedrockConverse({
 
 // Async function to trigger knowledge base sync (non-blocking)
 async function triggerKnowledgeBaseSync(batchInfo: string): Promise<void> {
-  const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID");
-  const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID");
+
 
   if (!knowledgeBaseId || !dataSourceId) {
     console.warn("⚠️ [ingestion] Knowledge base sync skipped - missing BEDROCK_KNOWLEDGE_BASE_ID or BEDROCK_DATA_SOURCE_ID");
@@ -137,7 +142,7 @@ router.post("/api/ingest", (req: Request, res: Response) => {
             console.log(`☁️ [ingestion] Uploading file ${i + 1} to S3...`);
 
             const uploadCommand = new PutObjectCommand({
-              Bucket: Deno.env.get("S3_BUCKET_NAME"),
+              Bucket: s3BucketName,
               Key: s3Key,
               Body: file.buffer,
               ContentType: file.mimetype,
@@ -281,7 +286,7 @@ The goal is to create meaningful context that supports real-time business intell
               data_classification: analysisData.data_classification,
               upload_timestamp: timestamp,
               s3_key: s3Key,
-              s3_bucket: Deno.env.get("S3_BUCKET_NAME") || "",
+              s3_bucket: s3BucketName || "",
               content_type: file.mimetype,
               last_modified: timestamp,
             };
@@ -314,7 +319,7 @@ The goal is to create meaningful context that supports real-time business intell
             }
 
             const dbCommand = new PutItemCommand({
-              TableName: Deno.env.get("DYNAMODB_S3_TABLE"),
+              TableName: s3BucketName,
               Item: dynamoItem,
             });
 

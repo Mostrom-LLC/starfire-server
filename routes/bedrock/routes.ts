@@ -12,11 +12,11 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 
 import { Document } from "@langchain/core/documents";
 
-const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+// Environment variables
 const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
-const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
 const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
-const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID") || "";
+const dynamodbChatsTable = Deno.env.get("DYNAMODB_CHATS_TABLE") || "langchain";
 
 const router = Router();
 
@@ -92,11 +92,11 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
         console.log(`⚡ [v3] Initializing components...`);
 
         const chatHistory = new DynamoDBChatMessageHistory({
-          tableName: Deno.env.get("DYNAMODB_CHATS_TABLE") || "langchain",
+          tableName: dynamodbChatsTable,
           partitionKey: "id",
           sessionId,
           config: {
-            region: Deno.env.get("AWS_REGION") || "us-east-1"
+            region: awsRegion
           },
         });
 

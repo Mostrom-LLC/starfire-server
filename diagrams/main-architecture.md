@@ -9,26 +9,26 @@ graph TD
     D --> E[Bedrock Routes]
     D --> F[Ingestion Routes]
     D --> G[Visualization Routes]
-    D --> H[Health & Status Routes]
+    D --> H[Health and Status Routes]
     
-    H --> I[/healthcheck, /api/status]
+    H --> I[Health Check Endpoints]
     
-    E --> J[WebSocket /ws/query]
+    E --> J[WebSocket ws/query]
     J --> K[DynamoDB Chat History]
     J --> L[AWS Bedrock Knowledge Base]
     J --> M[ChatBedrockConverse LLM]
     
-    F --> N[POST /api/ingest]
-    F --> O[GET /api/ingest]
+    F --> N[POST api/ingest]
+    F --> O[GET api/ingest]
     N --> P[AWS S3 Storage]
     N --> Q[DynamoDB Metadata]
     N --> R[Bedrock Knowledge Base Sync]
     O --> Q
     
-    G --> S[POST /api/visualize/generate]
-    G --> T[GET /api/visualize/:id]
-    G --> U[POST /api/visualize/:id/powerpoint]
-    G --> V[POST /api/visualize/:id/pdf]
+    G --> S[POST api/visualize/generate]
+    G --> T[GET api/visualize/id]
+    G --> U[POST api/visualize/id/powerpoint]
+    G --> V[POST api/visualize/id/pdf]
     
     S --> L
     S --> Q
@@ -42,7 +42,7 @@ graph TD
     V --> Y
     
     AA[OpenAPI Documentation] --> BB[Scalar API Docs]
-    BB --> CC[/api-docs]
+    BB --> CC[API Documentation]
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5

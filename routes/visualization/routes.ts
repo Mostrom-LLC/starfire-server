@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import {
-  BedrockAgentRuntimeClient,
   // Unused but kept for future implementation
   RetrieveAndGenerateCommand as _RetrieveAndGenerateCommand,
 } from "@aws-sdk/client-bedrock-agent-runtime";
@@ -25,11 +24,7 @@ const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
 const dynamodbS3Table = Deno.env.get("DYNAMODB_S3_TABLE") || "";
 const dynamodbVisualizationsTable = Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations";
 
-// Initialize AWS clients
-// Unused but kept for future implementation
-const _bedrockClient = new BedrockAgentRuntimeClient({
-  region: awsRegion,
-});
+
 
 const dynamoClient = new DynamoDBClient({
   region: awsRegion,

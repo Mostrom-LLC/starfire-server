@@ -2,49 +2,47 @@
 
 ```mermaid
 graph TD
-    A[POST /api/ingest] --> B[API Key Check]
-    B --> C[Multer File Upload]
-    C --> D[Process Each File]
+    A[POST /api/ingest] --> B[Multer File Upload]
+    B --> C[Process Each File]
     
-    D --> E[Generate File ID & S3 Key]
-    E --> F[Upload to S3]
-    F --> G[Trigger Knowledge Base Sync]
-    F --> H[LLM File Analysis]
+    C --> D[Generate File ID & S3 Key]
+    D --> E[Upload to S3]
+    E --> F[Trigger Knowledge Base Sync]
+    E --> G[LLM File Analysis]
     
-    G --> I[StartIngestionJob Command]
-    I --> J[Background Knowledge Base Update]
+    F --> H[StartIngestionJob Command]
+    H --> I[Background Knowledge Base Update]
     
-    H --> K[Generate Analysis Prompt]
-    K --> L[Call ChatBedrockConverse]
-    L --> M[Parse LLM Response]
-    M --> N{Parse Success?}
-    N -->|Yes| O[Use LLM Analysis]
-    N -->|No| P[Use Intelligent Fallback]
+    G --> J[Generate Analysis Prompt]
+    J --> K[Call ChatBedrockConverse]
+    K --> L[Parse LLM Response]
+    L --> M{Parse Success?}
+    M -->|Yes| N[Use LLM Analysis]
+    M -->|No| O[Use Intelligent Fallback]
     
-    O --> Q[Create File Analysis Object]
-    P --> Q
-    Q --> R[Store in DynamoDB]
-    R --> S[Add to Results]
+    N --> P[Create File Analysis Object]
+    O --> P
+    P --> Q[Store in DynamoDB]
+    Q --> R[Add to Results]
     
-    S --> T{More Files?}
-    T -->|Yes| D
-    T -->|No| U[Return Batch Results]
+    R --> S{More Files?}
+    S -->|Yes| C
+    S -->|No| T[Return Batch Results]
     
-    V[GET /api/ingest] --> W[API Key Check]
-    W --> X[Parse Pagination Parameters]
-    X --> Y[Scan DynamoDB Table]
-    Y --> Z[Transform Items]
-    Z --> AA[Sort by Upload Time]
-    AA --> BB[Apply Pagination]
-    BB --> CC[Return Paginated Results]
+    U[GET /api/ingest] --> V[Parse Pagination Parameters]
+    V --> W[Scan DynamoDB Table]
+    W --> X[Transform Items]
+    X --> Y[Sort by Upload Time]
+    Y --> Z[Apply Pagination]
+    Z --> AA[Return Paginated Results]
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5
-    style F fill:#e8f5e8
-    style H fill:#fff3e0
-    style R fill:#fce4ec
-    style V fill:#e1f5fe
-    style Y fill:#f1f8e9
+    style E fill:#e8f5e8
+    style G fill:#fff3e0
+    style Q fill:#fce4ec
+    style U fill:#e1f5fe
+    style W fill:#f1f8e9
 ```
 
 ## Description
@@ -56,8 +54,6 @@ File ingestion system that uploads files to S3, analyzes them with AI, and store
 [User] (via File Upload UI)
    ↓
 HTTP POST → `/api/ingest` (with files)
-   ↓
-API Key validation
    ↓
 Multer file processing (up to 1GB per file)
    ↓
@@ -84,8 +80,6 @@ Batch response with analysis results
 [User] (via File Management UI)
    ↓
 HTTP GET → `/api/ingest?page=1&pageCount=20`
-   ↓
-API Key validation
    ↓
 DynamoDB scan with pagination
    ↓

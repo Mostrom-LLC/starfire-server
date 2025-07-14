@@ -77,7 +77,6 @@ app.get("/", (_req: Request, res: Response) => {
     documentation: "/api-docs",
     endpoints: {
       "websocket-v1": "ws://localhost:8000/ws/query",
-      "rest-v2": "POST /api/query-v2 (LangChain + DynamoDB + Ably streaming)",
       "websocket-v3": "ws://localhost:8000/ws/query-v3 (LangChain + DynamoDB + WebSocket streaming)",
       "ingestion": "POST /api/ingest (File upload, analysis & storage), GET /api/ingest (List files)",
       "visualization": "POST /api/visualize (Generate chart data and insights), GET /api/visualize/topics (Get available topics)"

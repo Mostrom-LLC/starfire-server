@@ -25,7 +25,7 @@ const bedrockClient = new BedrockAgentRuntimeClient({
 export const setupWebSocketRoutes = (app: Application & { ws: (path: string, handler: (ws: WebSocket, req: Request) => void) => void }) => {
 
 
-  // WebSocket endpoint for v3 with LangChain + DynamoDB (no Ably)
+  // WebSocket endpoint for v3 with LangChain + DynamoDB
   app.ws("/ws/query", (ws: WebSocket, _req: Request) => {
     console.log("WebSocket v3 connection opened");
 

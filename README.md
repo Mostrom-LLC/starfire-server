@@ -48,8 +48,6 @@ NODE_ENV=local
 PORT=8000
 API_KEY=your-api-key
 
-# Optional: Ably Configuration (for v2 streaming)
-ABLY_API_KEY=your-ably-api-key
 ```
 
 ### Running the Server
@@ -262,47 +260,6 @@ For a query like `{"query": "What are geographic regions where drug utilization 
 
 **Note**: The `{"type": "end"}` message is **always** sent at the end of every response to signal completion.
 
-### API V2 Usage (with Memory + Ably)
-
-The `/api/query-v2` endpoint uses LangChain with DynamoDB memory and Ably for real-time streaming. Send a POST request to `http://localhost:8000/api/query-v2` with:
-
-```json
-{
-  "sessionId": "unique-session-id",
-  "query": "What is the capital of France?"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "channel": "query:unique-session-id"
-}
-```
-
-**Key differences from v1:**
-- **REST endpoint**: Uses POST request instead of WebSocket
-- **Ably streaming**: Real-time streaming via Ably channels
-- **sessionId required**: Each conversation needs a unique session ID
-- **Conversational memory**: Previous messages in the session are remembered using DynamoDB
-- **Source documents**: Returned in the "done" event
-- **Modern LangChain**: Uses latest LCEL with `createHistoryAwareRetriever`, `createRetrievalChain`, and `ChatBedrockConverse`
-
-**Ably Events:**
-- **"token"**: Streaming text tokens `{ token: "text" }`
-- **"done"**: Completion with answer and sources `{ done: true, answer: "...", sources: [...] }`
-
-### Environment Variables for V2
-
-Add these to your `.env` file:
-
-```env
-DYNAMODB_CHATS_TABLE=starfire-rag-agent
-ABLY_API_KEY=your-ably-api-key
-```
-
-**Note**: The ABLY_API_KEY is required for the v2 endpoint to work. You can get an API key from [Ably.com](https://ably.com).
 
 ## Testing
 

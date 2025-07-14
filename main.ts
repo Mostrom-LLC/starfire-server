@@ -169,13 +169,11 @@ app.get("/api-docs/json", (_req: Request, res: Response) => {
 app.use(
   "/api-docs",
   apiReference({
-    url: "/api-docs/json",
+    spec: {
+      url: "/api-docs/json",
+    },
     theme: "default",
     layout: "classic",
-    defaultHttpClient: {
-      targetKey: "node",
-      clientKey: "fetch",
-    },
   })
 );
 

@@ -50,6 +50,50 @@ graph TD
 ## Description
 File ingestion system that uploads files to S3, analyzes them with AI, and stores metadata in DynamoDB.
 
+## User Flow - POST /api/ingest
+
+```
+[User] (via File Upload UI)
+   ↓
+HTTP POST → `/api/ingest` (with files)
+   ↓
+API Key validation
+   ↓
+Multer file processing (up to 1GB per file)
+   ↓
+For each file:
+   • Generate UUID & S3 key
+   • Upload to S3 with metadata
+   • Trigger Bedrock Knowledge Base sync (async)
+   • AI analysis with ChatBedrockConverse
+   ↓
+Commercial intelligence extraction:
+   • Market access themes
+   • HEOR insights
+   • Competitive analysis
+   • Physician profiling data
+   ↓
+Structured metadata → DynamoDB
+   ↓
+Batch response with analysis results
+```
+
+## User Flow - GET /api/ingest
+
+```
+[User] (via File Management UI)
+   ↓
+HTTP GET → `/api/ingest?page=1&pageCount=20`
+   ↓
+API Key validation
+   ↓
+DynamoDB scan with pagination
+   ↓
+Sort by upload timestamp (newest first)
+   ↓
+Return paginated file metadata
+```
+
 ## POST /api/ingest Features
 - **Multi-file Upload**: Supports batch file uploads
 - **AI Analysis**: Uses Claude to analyze file content and extract commercial intelligence

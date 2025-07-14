@@ -56,6 +56,76 @@ graph TD
 ## Description
 Comprehensive visualization system that generates executive-ready charts, insights, and export capabilities.
 
+## User Flow - POST /api/visualize/generate
+
+```
+[User] (via Dashboard UI)
+   ↓
+HTTP POST → `/api/visualize/generate`
+   ↓
+API Key validation
+   ↓
+Knowledge base data retrieval:
+   • AmazonKnowledgeBaseRetriever (topK=20)
+   • DynamoDB file metadata scan
+   ↓
+LLM analysis with ChatBedrockConverse:
+   • Commercial intelligence focus
+   • Executive-level insights
+   • 4 chart types (bar, line, pie, radar)
+   ↓
+Visualization set creation:
+   • Business-relevant titles
+   • Actionable recommendations
+   • Performance metrics
+   ↓
+DynamoDB storage → Return summary
+```
+
+## User Flow - POST /api/visualize/:id/powerpoint
+
+```
+[User] (via Export UI)
+   ↓
+HTTP POST → `/api/visualize/:id/powerpoint`
+   ↓
+API Key validation
+   ↓
+Retrieve visualization set from DynamoDB
+   ↓
+PowerPoint generation:
+   • Corporate branding (Starfire theme)
+   • Custom charts with shapes
+   • Executive summary slides
+   • Two-column layout
+   ↓
+Upload PPTX → S3
+   ↓
+Generate pre-signed URL → Return download link
+```
+
+## User Flow - POST /api/visualize/:id/pdf
+
+```
+[User] (via Export UI)
+   ↓
+HTTP POST → `/api/visualize/:id/pdf`
+   ↓
+API Key validation
+   ↓
+Retrieve visualization set from DynamoDB
+   ↓
+PDF generation:
+   • HTML content creation
+   • Puppeteer rendering
+   • Professional styling
+   • Multi-page report
+   ↓
+Upload PDF → S3
+   ↓
+Generate pre-signed URL → Return download link
+```
+
 ## POST /api/visualize/generate Features
 - **Auto-Analysis**: Automatically analyzes knowledge base data
 - **Executive Focus**: Generates business-relevant insights for pharmaceutical commercial teams

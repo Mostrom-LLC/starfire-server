@@ -78,11 +78,115 @@ deno task start
 - **GET /api/ingest** - Fetch paginated list of ingested files with support for page-based pagination
 
 #### Visualization
-- **POST /api/visualize** - Generate multiple visualizations from knowledge base data
+- **POST /api/visualize/generate** - Generate multiple visualizations from knowledge base data
 - **GET /api/visualize** - List all visualization sets
 - **GET /api/visualize/:id** - Get a specific visualization set
 - **POST /api/visualize/:id/powerpoint** - Generate PowerPoint presentation from visualization set
 - **POST /api/visualize/:id/pdf** - Generate PDF report from visualization set
+
+## User Flows
+
+### WebSocket Query Flow - `/ws/query`
+
+```
+[User] (via Chat UI)
+   ↓
+WebSocket Connection → `/ws/query`
+   ↓
+LangChainJS stack:
+   • ChatBedrockConverse (LLM)
+   • DynamoDBChatMessageHistory
+   • AmazonKnowledgeBaseRetriever (Bedrock KB)
+   • createHistoryAwareRetriever (LangChain)
+   ↓
+Prompt construction:
+   • Truncated context from retrieved docs
+   • Recent conversation history
+   • Business-aligned system prompt
+   ↓
+AWS Bedrock `RetrieveAndGenerateStreamCommand`
+   ↓
+Response streamed token-by-token via WebSocket
+   ↓
+Frontend renders in real-time
+   ↓
+Final result + source docs
+```
+
+### File Ingestion Flow - `/api/ingest`
+
+```
+[User] (via File Upload UI)
+   ↓
+HTTP POST → `/api/ingest` (with files)
+   ↓
+API Key validation
+   ↓
+Multer file processing (up to 1GB per file)
+   ↓
+For each file:
+   • Generate UUID & S3 key
+   • Upload to S3 with metadata
+   • Trigger Bedrock Knowledge Base sync (async)
+   • AI analysis with ChatBedrockConverse
+   ↓
+Commercial intelligence extraction:
+   • Market access themes
+   • HEOR insights
+   • Competitive analysis
+   • Physician profiling data
+   ↓
+Structured metadata → DynamoDB
+   ↓
+Batch response with analysis results
+```
+
+### Visualization Generation Flow - `/api/visualize/generate`
+
+```
+[User] (via Dashboard UI)
+   ↓
+HTTP POST → `/api/visualize/generate`
+   ↓
+API Key validation
+   ↓
+Knowledge base data retrieval:
+   • AmazonKnowledgeBaseRetriever (topK=20)
+   • DynamoDB file metadata scan
+   ↓
+LLM analysis with ChatBedrockConverse:
+   • Commercial intelligence focus
+   • Executive-level insights
+   • 4 chart types (bar, line, pie, radar)
+   ↓
+Visualization set creation:
+   • Business-relevant titles
+   • Actionable recommendations
+   • Performance metrics
+   ↓
+DynamoDB storage → Return summary
+```
+
+### Document Export Flow - `/api/visualize/:id/powerpoint` | `/api/visualize/:id/pdf`
+
+```
+[User] (via Export UI)
+   ↓
+HTTP POST → `/api/visualize/:id/powerpoint` or `/pdf`
+   ↓
+API Key validation
+   ↓
+Retrieve visualization set from DynamoDB
+   ↓
+Document generation:
+   • PowerPoint: Corporate branding + custom charts
+   • PDF: HTML rendering via Puppeteer
+   • Executive-ready formatting
+   ↓
+Upload to S3
+   ↓
+Generate pre-signed URL → Return download link
+```
 
 ### WebSocket Usage
 
@@ -224,8 +328,6 @@ ABLY_API_KEY=your-ably-api-key
 For detailed technical diagrams of the system architecture and API flows, see the [diagrams](./diagrams/) folder:
 
 - **[Main Architecture](./diagrams/main-architecture.md)** - Complete system overview and component relationships
-- **[Health Routes](./diagrams/health-routes.md)** - Health check endpoint flow
-- **[Status Routes](./diagrams/status-routes.md)** - API status endpoint flow
 - **[Bedrock Routes](./diagrams/bedrock-routes.md)** - WebSocket streaming and conversational AI flow
 - **[Ingestion Routes](./diagrams/ingestion-routes.md)** - File upload, analysis, and storage flow
 - **[Visualization Routes](./diagrams/visualization-routes.md)** - Chart generation and export flow

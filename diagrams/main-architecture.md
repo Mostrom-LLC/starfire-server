@@ -6,54 +6,52 @@ graph TD
     B --> C[CORS Middleware]
     C --> D[Route Handlers]
     
-    D --> E[Health Routes]
-    D --> F[Status Routes]
-    D --> G[Bedrock Routes]
-    D --> H[Ingestion Routes]
-    D --> I[Visualization Routes]
+    D --> E[Bedrock Routes]
+    D --> F[Ingestion Routes]
+    D --> G[Visualization Routes]
+    D --> H[Health & Status Routes]
     
-    E --> J[/healthcheck]
-    F --> K[/api/status]
+    H --> I[/healthcheck, /api/status]
     
-    G --> L[WebSocket /ws/query]
-    L --> M[DynamoDB Chat History]
-    L --> N[AWS Bedrock Knowledge Base]
-    L --> O[ChatBedrockConverse LLM]
+    E --> J[WebSocket /ws/query]
+    J --> K[DynamoDB Chat History]
+    J --> L[AWS Bedrock Knowledge Base]
+    J --> M[ChatBedrockConverse LLM]
     
-    H --> P[POST /api/ingest]
-    H --> Q[GET /api/ingest]
-    P --> R[AWS S3 Storage]
-    P --> S[DynamoDB Metadata]
-    P --> T[Bedrock Knowledge Base Sync]
-    Q --> S
+    F --> N[POST /api/ingest]
+    F --> O[GET /api/ingest]
+    N --> P[AWS S3 Storage]
+    N --> Q[DynamoDB Metadata]
+    N --> R[Bedrock Knowledge Base Sync]
+    O --> Q
     
-    I --> U[POST /api/visualize/generate]
-    I --> V[GET /api/visualize/:id]
-    I --> W[POST /api/visualize/:id/powerpoint]
-    I --> X[POST /api/visualize/:id/pdf]
+    G --> S[POST /api/visualize/generate]
+    G --> T[GET /api/visualize/:id]
+    G --> U[POST /api/visualize/:id/powerpoint]
+    G --> V[POST /api/visualize/:id/pdf]
     
-    U --> N
-    U --> S
-    U --> Y[DynamoDB Visualizations]
+    S --> L
+    S --> Q
+    S --> W[DynamoDB Visualizations]
+    T --> W
+    U --> W
+    U --> X[PowerPoint Generation]
+    U --> Y[S3 Document Storage]
+    V --> W
+    V --> Z[PDF Generation]
     V --> Y
-    W --> Y
-    W --> Z[PowerPoint Generation]
-    W --> AA[S3 Document Storage]
-    X --> Y
-    X --> BB[PDF Generation]
-    X --> AA
     
-    CC[OpenAPI Documentation] --> DD[Scalar API Docs]
-    DD --> EE[/api-docs]
+    AA[OpenAPI Documentation] --> BB[Scalar API Docs]
+    BB --> CC[/api-docs]
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style D fill:#e8f5e8
-    style N fill:#fff3e0
-    style R fill:#fce4ec
-    style S fill:#f1f8e9
-    style Y fill:#e3f2fd
-    style AA fill:#f8bbd9
+    style L fill:#fff3e0
+    style P fill:#fce4ec
+    style Q fill:#f1f8e9
+    style W fill:#e3f2fd
+    style Y fill:#f8bbd9
 ```
 
 ## Technology Stack
@@ -67,11 +65,6 @@ graph TD
 - **Export**: PowerPoint (PptxGenJS) and PDF (Puppeteer)
 
 ## Key Components
-
-### Health & Status
-- Simple monitoring endpoints
-- System health checks
-- Environment information
 
 ### Bedrock Integration
 - Real-time WebSocket streaming

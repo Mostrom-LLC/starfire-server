@@ -1,6 +1,6 @@
 # 🦕 Starfire API Server
 
-A modern, TypeScript-first API built with Deno and Express for the Starfire AI-native intelligence platform for life sciences teams. Features include data ingestion, knowledge base querying, chat functionality, and visualization capabilities.
+A modern, TypeScript-first API built with Deno and Express for the Starfire AI-native intelligence platform. Features include data ingestion, knowledge base querying, chat functionality, and visualization capabilities.
 
 ## Features
 

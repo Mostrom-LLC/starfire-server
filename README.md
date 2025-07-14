@@ -213,9 +213,22 @@ ABLY_API_KEY=your-ably-api-key
 - **routes/bedrock/api.ts** - OpenAPI specification for Bedrock endpoints
 - **routes/health/routes.ts** - Health check endpoints
 - **routes/status/routes.ts** - Status endpoints
+- **routes/ingestion/routes.ts** - File upload and analysis endpoints
+- **routes/visualization/routes.ts** - Data visualization and export endpoints
 - **deno.json** - Deno configuration and dependencies
 - **websocket_test.html** - Simple web client for testing
 - **.env** - Environment variables
+
+### Architecture Diagrams
+
+For detailed technical diagrams of the system architecture and API flows, see the [diagrams](./diagrams/) folder:
+
+- **[Main Architecture](./diagrams/main-architecture.md)** - Complete system overview and component relationships
+- **[Health Routes](./diagrams/health-routes.md)** - Health check endpoint flow
+- **[Status Routes](./diagrams/status-routes.md)** - API status endpoint flow
+- **[Bedrock Routes](./diagrams/bedrock-routes.md)** - WebSocket streaming and conversational AI flow
+- **[Ingestion Routes](./diagrams/ingestion-routes.md)** - File upload, analysis, and storage flow
+- **[Visualization Routes](./diagrams/visualization-routes.md)** - Chart generation and export flow
 
 ## Dependencies
 

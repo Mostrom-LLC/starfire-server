@@ -12,6 +12,7 @@
     "@aws-sdk/client-bedrock-agent-runtime": "npm:@aws-sdk/client-bedrock-agent-runtime@^3.700.0",
     "@aws-sdk/client-bedrock-runtime": "npm:@aws-sdk/client-bedrock-runtime@^3.700.0",
     "@scalar/express-api-reference": "npm:@scalar/express-api-reference@^0.8.9",
+    "@scalar/core": "npm:@scalar/core@^0.8.0",
     "dotenv": "npm:dotenv@^16.4.5",
     "cors": "npm:cors@^2.8.5",
     "@types/cors": "npm:@types/cors@^2.8.17",

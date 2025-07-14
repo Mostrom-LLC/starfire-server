@@ -1,6 +1,6 @@
-# 🦕 Deno Knowledge Base API
+# 🦕 Starfire API Server
 
-A modern, TypeScript-first API built with Deno and Express for querying AWS Bedrock knowledge bases with real-time WebSocket streaming.
+A modern, TypeScript-first API built with Deno and Express for the Starfire AI-native intelligence platform for life sciences teams. Features include data ingestion, knowledge base querying, chat functionality, and visualization capabilities.
 
 ## Features
 
@@ -8,8 +8,11 @@ A modern, TypeScript-first API built with Deno and Express for querying AWS Bedr
 - 🔥 **Express Framework** - Battle-tested web framework with WebSocket support
 - 🌊 **WebSocket Streaming** - Real-time response streaming from AWS Bedrock
 - 📚 **Scalar Documentation** - Beautiful, interactive API documentation
-- 🔒 **Type Safety** - Full TypeScript support without any types
+- 🔒 **Type Safety** - Full TypeScript support
 - 🚀 **AWS Bedrock Integration** - Native streaming support with AWS SDK v3
+- 📊 **Visualization Generation** - AI-powered chart and PowerPoint generation
+- 📁 **Data Ingestion** - File upload and analysis with AWS S3 and DynamoDB
+- 💬 **Chat Memory** - Persistent chat history with DynamoDB
 
 ## Quick Start
 
@@ -24,10 +27,28 @@ A modern, TypeScript-first API built with Deno and Express for querying AWS Bedr
 Create a `.env` file or set these environment variables:
 
 ```env
-BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
-STRANDS_KNOWLEDGE_BASE_ID=your-knowledge-base-id
+# AWS Configuration
 AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
+
+# Knowledge Base Configuration
+BEDROCK_KNOWLEDGE_BASE_ID=your-knowledge-base-id
+BEDROCK_DATA_SOURCE_ID=your-data-source-id
+
+# S3 Configuration
+S3_BUCKET_NAME=your-s3-bucket-name
+
+# DynamoDB Configuration
+DYNAMODB_DOCUMENTS_TABLE=your-documents-table
+DYNAMODB_CHAT_HISTORY_TABLE=your-chat-history-table
+DYNAMODB_VISUALIZATIONS_TABLE=your-visualizations-table
+
+# API Configuration
 PORT=8000
+API_KEY=your-api-key
+
+# Optional: Ably Configuration (for v2 streaming)
+ABLY_API_KEY=your-ably-api-key
 ```
 
 ### Running the Server
@@ -42,12 +63,25 @@ deno task start
 
 ### API Endpoints
 
-- **GET /** - Root endpoint with basic info
+#### Health and Status
 - **GET /healthcheck** - Health check endpoint
+- **GET /api/status** - API status information
 - **GET /api-docs** - Interactive Scalar API documentation
 - **GET /api-docs/json** - OpenAPI specification
-- **WS /ws/query** - WebSocket endpoint for streaming queries
-- **POST /api/query-v2** - REST endpoint with LangChain + DynamoDB memory + Ably streaming
+
+#### Knowledge Base Querying
+- **WS /ws/query** - WebSocket endpoint for streaming knowledge base queries
+
+#### Data Ingestion
+- **POST /api/ingest** - Upload and analyze files (stores in S3 and DynamoDB)
+- **GET /api/ingest** - Fetch paginated list of ingested files with support for page-based pagination
+
+#### Visualization
+- **POST /api/visualize** - Generate multiple visualizations from knowledge base data
+- **GET /api/visualize** - List all visualization sets
+- **GET /api/visualize/:id** - Get a specific visualization set
+- **POST /api/visualize/:id/powerpoint** - Generate PowerPoint presentation from visualization set
+- **POST /api/visualize/:id/pdf** - Generate PDF report from visualization set
 
 ### WebSocket Usage
 

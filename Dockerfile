@@ -22,6 +22,7 @@ ENV DYNAMODB_S3_TABLE=''
 ENV DYNAMODB_VISUALIZATIONS_TABLE=''
 # Optional: Ably Configuration (for v2 streaming)
 ENV ABLY_API_KEY=''
+ENV VITE_BASE_URL=''
 
 EXPOSE 80
 

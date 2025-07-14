@@ -10,6 +10,14 @@ import { checkApiKey } from "../../lib/check-api-key.ts";
 
 const router = Router();
 
+// Environment variables
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
+const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID") || "";
+const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const dynamodbS3Table = Deno.env.get("DYNAMODB_S3_TABLE") || "";
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -21,23 +29,6 @@ const upload = multer({
     cb(null, true);
   },
 });
-
-// Debug log to check environment variables
-console.log("🔍 [ingestion] Environment variables check:");
-console.log(`🔍 [ingestion] BEDROCK_MODEL_ID: ${Deno.env.get("BEDROCK_MODEL_ID")}`);
-console.log(`🔍 [ingestion] AWS_REGION: ${Deno.env.get("AWS_REGION")}`);
-console.log(`🔍 [ingestion] S3_BUCKET_NAME: ${Deno.env.get("S3_BUCKET_NAME")}`);
-console.log(`🔍 [ingestion] BEDROCK_KNOWLEDGE_BASE_ID: ${Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID")}`);
-console.log(`🔍 [ingestion] BEDROCK_DATA_SOURCE_ID: ${Deno.env.get("BEDROCK_DATA_SOURCE_ID")}`);
-
-// Use a model that's available in your AWS account
-// Explicitly set to claude-3-sonnet-20240229-v1:0 which is more widely available
-const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-sonnet-20240229-v1:0";
-const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
-const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
-const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID");
-const dataSourceId = Deno.env.get("BEDROCK_DATA_SOURCE_ID");
-const dynamodbTable = Deno.env.get("DYNAMODB_S3_TABLE") || "";
 
 // Initialize AWS clients
 const s3Client = new S3Client({
@@ -52,31 +43,15 @@ const bedrockAgentClient = new BedrockAgentClient({
   region: awsRegion,
 });
 
-
-
-// Initialize LLM for analysis with error handling
-let llm: ChatBedrockConverse;
-try {
-  console.log(`🔄 [ingestion] Initializing Bedrock LLM with model: ${bedrockModelId}`);
-  llm = new ChatBedrockConverse({
-    model: bedrockModelId,
-    region: awsRegion,
-    streaming: false,
-  });
-} catch (error) {
-  console.error(`❌ [ingestion] Error initializing Bedrock LLM: ${error}`);
-  // Create a fallback implementation that logs errors but doesn't break the app
-  llm = new ChatBedrockConverse({
-    model: "anthropic.claude-3-sonnet-20240229-v1:0", // Fallback to a model that should be available
-    region: awsRegion,
-    streaming: false,
-  });
-}
+// Initialize LLM for analysis
+const llm = new ChatBedrockConverse({
+  model: bedrockModelId,
+  region: awsRegion,
+  streaming: false,
+});
 
 // Async function to trigger knowledge base sync (non-blocking)
 async function triggerKnowledgeBaseSync(batchInfo: string): Promise<void> {
-
-
   if (!knowledgeBaseId || !dataSourceId) {
     console.warn("⚠️ [ingestion] Knowledge base sync skipped - missing BEDROCK_KNOWLEDGE_BASE_ID or BEDROCK_DATA_SOURCE_ID");
     return;
@@ -309,7 +284,7 @@ The goal is to create meaningful context that supports real-time business intell
               data_classification: analysisData.data_classification,
               upload_timestamp: timestamp,
               s3_key: s3Key,
-              s3_bucket: s3BucketName || "",
+              s3_bucket: s3BucketName,
               content_type: file.mimetype,
               last_modified: timestamp,
             };
@@ -342,7 +317,7 @@ The goal is to create meaningful context that supports real-time business intell
             }
 
             const dbCommand = new PutItemCommand({
-              TableName: dynamodbTable,
+              TableName: dynamodbS3Table,
               Item: dynamoItem,
             });
 
@@ -421,7 +396,7 @@ router.get("/api/ingest", checkApiKey, async (req: Request, res: Response) => {
     // This is a simplification - for production with large datasets, you'd want to implement
     // more efficient pagination directly with DynamoDB
     const scanParams: any = {
-      TableName: Deno.env.get("DYNAMODB_S3_TABLE"),
+      TableName: dynamodbS3Table,
     };
 
 

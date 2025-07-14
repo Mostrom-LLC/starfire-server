@@ -11,4 +11,10 @@ router.get("/healthcheck", (_req: Request, res: Response) => {
   });
 });
 
+// AWS ECS health check endpoint - minimal overhead
+router.get("/health", (_req: Request, res: Response) => {
+  // Simple 200 OK response for AWS health checks
+  res.status(200).send("OK");
+});
+
 export default router;

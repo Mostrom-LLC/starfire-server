@@ -72,7 +72,9 @@ app.use(morgan("dev", {
 
 // Define routes
 app.get("/", (_req: Request, res: Response) => {
-  res.json({
+  // Ensure we return a 200 status code for AWS health checks
+  res.status(200).json({
+    status: "healthy",
     message: "Knowledge Base API is running",
     documentation: "/api-docs",
     endpoints: {

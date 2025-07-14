@@ -24,6 +24,7 @@ const PORT = parseInt(Deno.env.get("PORT") || "8000");
 const ENV = Deno.env.get("NODE_ENV") || "dev";
 
 
+
 // Configure CORS middleware
 const allowedOrigins = [
   `http://localhost:${PORT}`,
@@ -31,6 +32,8 @@ const allowedOrigins = [
   'https://localhost:5173',
   Deno.env.get("VITE_BASE_URL")
 ].filter(Boolean);
+
+console.log("Allowed origins:", allowedOrigins);
 
 app.use(
   cors({

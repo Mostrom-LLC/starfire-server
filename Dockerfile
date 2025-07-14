@@ -28,14 +28,14 @@ EXPOSE 80
 
 WORKDIR /app
 
-
-
-
 # These steps will be re-run upon each file change in your working directory:
 COPY . .
 
-# Cache dependencies
-RUN deno cache main.ts
+# Clean up any existing node_modules symlinks to prevent conflicts
+RUN rm -rf node_modules
+
+# Cache dependencies with --reload flag to ensure fresh dependencies
+RUN deno cache --reload main.ts
 
 # Start the application using the same flags as in deno.json tasks
 CMD ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "--allow-sys", "--allow-write", "--allow-run", "main.ts"]

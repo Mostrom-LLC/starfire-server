@@ -21,15 +21,12 @@ dotenv.config();
 // Initialize Express app with WebSocket support
 const { app } = expressWs(express());
 const PORT = parseInt(Deno.env.get("PORT") || "8000");
-const ENV = Deno.env.get("NODE_ENV") || "dev";
 const HOST_HEADER = Deno.env.get("HOST_HEADER") || "localhost";
 
 
 // Configure CORS middleware
 const allowedOrigins = [
   `${HOST_HEADER}`,
-  'http://localhost:5173',
-  'https://localhost:5173',
   Deno.env.get("VITE_BASE_URL")
 ].filter(Boolean);
 

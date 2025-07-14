@@ -17,24 +17,32 @@ import { v4 as uuidv4 } from "uuid";
 
 const router = Router();
 
+// Environment variables
+const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
+const bedrockModelId = Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-sonnet-20240229-v1:0";
+const knowledgeBaseId = Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "";
+const s3BucketName = Deno.env.get("S3_BUCKET_NAME") || "";
+const dynamodbS3Table = Deno.env.get("DYNAMODB_S3_TABLE") || "";
+const dynamodbVisualizationsTable = Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations";
+
 // Initialize AWS clients
 // Unused but kept for future implementation
 const _bedrockClient = new BedrockAgentRuntimeClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const dynamoClient = new DynamoDBClient({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 const s3Client = new S3Client({
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  region: awsRegion,
 });
 
 // Initialize LLM for analysis
 const llm = new ChatBedrockConverse({
-  model: Deno.env.get("BEDROCK_MODEL_ID") || "anthropic.claude-3-sonnet-20240229-v1:0",
-  region: Deno.env.get("AWS_REGION") || "us-east-1",
+  model: bedrockModelId,
+  region: awsRegion,
   streaming: false,
 });
 
@@ -115,8 +123,8 @@ router.post("/api/visualize/generate", checkApiKey, async (_req: Request, res: R
     // Initialize Knowledge Base retriever
     const retriever = new AmazonKnowledgeBaseRetriever({
       topK: 20, // Retrieve more documents for comprehensive analysis
-      knowledgeBaseId: Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "",
-      region: Deno.env.get("AWS_REGION") || "us-east-1",
+      knowledgeBaseId,
+      region: awsRegion,
     });
 
     // Use a general query to retrieve a diverse set of documents
@@ -130,7 +138,7 @@ router.post("/api/visualize/generate", checkApiKey, async (_req: Request, res: R
     const metadataStartTime = Date.now();
 
     const scanParams = {
-      TableName: Deno.env.get("DYNAMODB_S3_TABLE"),
+      TableName: dynamodbS3Table,
       Limit: 50, // Limit to recent files
     };
 
@@ -398,7 +406,7 @@ Your deliverables should enable pharmaceutical executives to make strategic comm
       const dbItem = marshall(visualizationSet, { removeUndefinedValues: true });
 
       const putCommand = new PutItemCommand({
-        TableName: Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations",
+        TableName: dynamodbVisualizationsTable,
         Item: dbItem
       });
 
@@ -453,7 +461,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     // Step 1: Retrieve the existing visualization from DynamoDB
     console.log(`🔍 [powerpoint] Retrieving visualization ${visualizationId}...`);
     const getCommand = new GetItemCommand({
-      TableName: Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId })
     });
 
@@ -1160,7 +1168,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     const s3Key = `visualizations/powerpoint/${timestamp.split('T')[0]}/${fileName}`;
 
     const uploadCommand = new PutObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
       Body: new Uint8Array(pptxBuffer),
       ContentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -1181,7 +1189,7 @@ router.post("/api/visualize/:id/powerpoint", checkApiKey, async (req: Request, r
     const presignedStartTime = Date.now();
 
     const getObjectCommand = new GetObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
     });
 
@@ -1235,7 +1243,7 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     // Step 1: Retrieve the existing visualization from DynamoDB
     console.log(`🔍 [pdf] Retrieving visualization ${visualizationId}...`);
     const getCommand = new GetItemCommand({
-      TableName: Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId })
     });
 
@@ -1689,7 +1697,7 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     const s3Key = `visualizations/pdf/${timestamp.split('T')[0]}/${fileName}`;
 
     const uploadCommand = new PutObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
       Body: pdfBuffer,
       ContentType: "application/pdf",
@@ -1710,7 +1718,7 @@ router.post("/api/visualize/:id/pdf", checkApiKey, async (req: Request, res: Res
     const presignedStartTime = Date.now();
 
     const getObjectCommand = new GetObjectCommand({
-      Bucket: Deno.env.get("S3_BUCKET_NAME"),
+      Bucket: s3BucketName,
       Key: s3Key,
     });
 
@@ -1760,7 +1768,7 @@ router.get("/api/visualize/:id", checkApiKey, async (req: Request, res: Response
   try {
     // Get visualization from DynamoDB
     const getCommand = new GetItemCommand({
-      TableName: Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId })
     });
 
@@ -1803,7 +1811,7 @@ router.delete("/api/visualize/:id", checkApiKey, async (req: Request, res: Respo
   try {
     // Delete visualization from DynamoDB
     const deleteCommand = new DeleteItemCommand({
-      TableName: Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       Key: marshall({ id: visualizationId }),
       ReturnValues: "ALL_OLD"
     });
@@ -1852,7 +1860,7 @@ router.get("/api/visualize", checkApiKey, async (_req: Request, res: Response) =
   try {
     // Scan DynamoDB for all visualization sets
     const scanCommand = new ScanCommand({
-      TableName: Deno.env.get("DYNAMODB_VISUALIZATIONS_TABLE") || "starfire-visualizations",
+      TableName: dynamodbVisualizationsTable,
       ProjectionExpression: "id, title, summary, createdAt, #md, visualizations[0].chartType",
       ExpressionAttributeNames: {
         "#md": "metadata"

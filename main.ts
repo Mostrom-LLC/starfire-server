@@ -22,12 +22,12 @@ dotenv.config();
 const { app } = expressWs(express());
 const PORT = parseInt(Deno.env.get("PORT") || "8000");
 const ENV = Deno.env.get("NODE_ENV") || "dev";
-
+const HOST_HEADER = Deno.env.get("HOST_HEADER") || "localhost";
 
 
 // Configure CORS middleware
 const allowedOrigins = [
-  `http://localhost:${PORT}`,
+  `${HOST_HEADER}`,
   'http://localhost:5173',
   'https://localhost:5173',
   Deno.env.get("VITE_BASE_URL")
@@ -103,19 +103,10 @@ const openApiSpec = {
     description: "A simple Knowledge Base API built with Deno and Express for AWS Bedrock integration",
   },
   servers:
-    ENV === "dev"
-      ? [
-        {
-          url: `http://localhost:${PORT}`,
-          description: "Local Dev Server",
-        },
-      ]
-      : [
-        {
-          url: "/",
-          description: "Production Server",
-        },
-      ],
+  {
+    url: HOST_HEADER,
+    description: "Local Dev Server",
+  },
   tags: [
     {
       name: "Health",
@@ -208,7 +199,7 @@ globalThis.addEventListener("error", (e) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
-  console.log(`🔌 WebSocket v3: ws://localhost:${PORT}/ws/query`);
+  console.log(`🚀 Server running on ${HOST_HEADER}`);
+  console.log(`📚 API Documentation: ${HOST_HEADER}/api-docs`);
+  console.log(`🔌 WebSocket v3: ws://${HOST_HEADER}/ws/query`);
 });

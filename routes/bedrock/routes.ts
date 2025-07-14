@@ -86,7 +86,7 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
         console.log(`⚡ [v3] Initializing components...`);
 
         const chatHistory = new DynamoDBChatMessageHistory({
-          tableName: Deno.env.get("DYNAMODB_TABLE_NAME") || "langchain",
+          tableName: Deno.env.get("DYNAMODB_CHATS_TABLE") || "langchain",
           partitionKey: "id",
           sessionId,
           config: {
@@ -104,7 +104,7 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
         // Initialize Knowledge Base retriever
         const retriever = new AmazonKnowledgeBaseRetriever({
           topK: 3,
-          knowledgeBaseId: Deno.env.get("STRANDS_KNOWLEDGE_BASE_ID") || "",
+          knowledgeBaseId: Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID") || "",
           region: Deno.env.get("AWS_REGION") || "us-east-1",
         });
 
@@ -188,7 +188,7 @@ User question: ${query}`;
           retrieveAndGenerateConfiguration: {
             type: "KNOWLEDGE_BASE",
             knowledgeBaseConfiguration: {
-              knowledgeBaseId: Deno.env.get("STRANDS_KNOWLEDGE_BASE_ID"),
+              knowledgeBaseId: Deno.env.get("BEDROCK_KNOWLEDGE_BASE_ID"),
               modelArn: `arn:aws:bedrock:${Deno.env.get("AWS_REGION")}::foundation-model/${Deno.env.get("BEDROCK_MODEL_ID")}`,
             },
           },

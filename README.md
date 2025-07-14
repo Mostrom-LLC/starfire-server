@@ -41,7 +41,7 @@ S3_BUCKET_NAME=your-s3-bucket-name
 # DynamoDB Configuration
 DYNAMODB_DOCUMENTS_TABLE=your-documents-table
 DYNAMODB_CHAT_HISTORY_TABLE=your-chat-history-table
-DYNAMODB_VISUALIZATIONS_TABLE=your-visualizations-table
+DYNAMODB_DYNAMODB_VISUALIZATIONS_TABLE=your-visualizations-table
 
 # API Configuration
 PORT=8000
@@ -193,7 +193,7 @@ The `/api/query-v2` endpoint uses LangChain with DynamoDB memory and Ably for re
 Add these to your `.env` file:
 
 ```env
-DYNAMODB_TABLE_NAME=langchain
+DYNAMODB_CHATS_TABLE=langchain
 ABLY_API_KEY=your-ably-api-key
 ```
 

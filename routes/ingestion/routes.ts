@@ -314,7 +314,7 @@ The goal is to create meaningful context that supports real-time business intell
             }
 
             const dbCommand = new PutItemCommand({
-              TableName: Deno.env.get("S3_DYNAMODB_TABLE"),
+              TableName: Deno.env.get("DYNAMODB_S3_TABLE"),
               Item: dynamoItem,
             });
 
@@ -393,7 +393,7 @@ router.get("/api/ingest", checkApiKey, async (req: Request, res: Response) => {
     // This is a simplification - for production with large datasets, you'd want to implement
     // more efficient pagination directly with DynamoDB
     const scanParams: any = {
-      TableName: Deno.env.get("S3_DYNAMODB_TABLE"),
+      TableName: Deno.env.get("DYNAMODB_S3_TABLE"),
     };
 
 
@@ -431,21 +431,21 @@ router.get("/api/ingest", checkApiKey, async (req: Request, res: Response) => {
 
     // Sort by upload timestamp (newest first)
     items.sort((a, b) => new Date(b.upload_timestamp).getTime() - new Date(a.upload_timestamp).getTime());
-    
+
     // Calculate total count (in a real production app, you might want to use a separate count query or cache this)
     const total = items.length;
-    
+
     // Calculate pagination values
     const totalPages = Math.max(1, Math.ceil(total / pageCount));
     const startIndex = (page - 1) * pageCount;
     const endIndex = Math.min(startIndex + pageCount, total);
-    
+
     // Get items for current page
     const pageItems = items.slice(startIndex, endIndex);
-    
+
     // Determine if there are more pages
     const hasMore = page < totalPages;
-    
+
     // Prepare pagination response
     const response: any = {
       data: pageItems,

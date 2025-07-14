@@ -120,7 +120,7 @@ Required environment variables:
 - `AWS_REGION`: AWS region (default: us-east-1)
 - `BEDROCK_MODEL_ID`: Bedrock model ID (default: anthropic.claude-3-5-sonnet-20240620-v1:0)
 - `S3_BUCKET_NAME`: S3 bucket for document storage
-- `S3_DYNAMODB_TABLE`: DynamoDB table for metadata
+- `DYNAMODB_S3_TABLE`: DynamoDB table for metadata
 - `BEDROCK_KNOWLEDGE_BASE_ID`: Knowledge base ID (optional)
 - `BEDROCK_DATA_SOURCE_ID`: Data source ID (optional)
 

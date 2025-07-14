@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(deno check:*)",
+      "WebFetch(domain:js.langchain.com)",
+      "Bash(mkdir:*)",
+      "Bash(deno task:*)",
+      "WebFetch(domain:swagger.io)",
+      "Bash(curl:*)",
+      "WebFetch(domain:docs.aws.amazon.com)",
+      "Bash(grep:*)",
+      "Bash(deno lint:*)"
+    ],
+    "deny": []
+  }
+}

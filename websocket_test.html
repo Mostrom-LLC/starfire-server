@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Deno Knowledge Base WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .input-group { margin-bottom: 20px; }
+        input[type="text"] { width: 400px; padding: 8px; margin-right: 10px; }
+        button { padding: 8px 16px; margin-right: 10px; }
+        #status { margin-top: 10px; font-weight: bold; }
+        #messages { margin-top: 20px; border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; background-color: #f9f9f9; }
+        .api-docs { margin-top: 20px; padding: 10px; background-color: #e8f4f8; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦕 Deno Knowledge Base WebSocket Test</h1>
+        <div class="input-group">
+            <input type="text" id="queryInput" placeholder="Enter your query..." />
+            <button onclick="sendQuery()">Send Query</button>
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+        </div>
+        <div id="status">Not connected</div>
+        <div id="messages"></div>
+        
+        <div class="api-docs">
+            <h3>📚 API Documentation</h3>
+            <p>Visit <a href="http://localhost:8000/api-docs" target="_blank">http://localhost:8000/api-docs</a> to view the interactive Scalar API documentation.</p>
+            <p><strong>WebSocket Endpoint:</strong> ws://localhost:8000/ws/query</p>
+            <p><strong>Message Format:</strong> <code>{"query": "your question here"}</code></p>
+            <p><strong>Express + Deno:</strong> Modern TypeScript runtime with Express framework</p>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const messages = document.getElementById('messages');
+        const status = document.getElementById('status');
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:8000/ws/query');
+            
+            ws.onopen = function(event) {
+                status.textContent = 'Connected';
+                status.style.color = 'green';
+                messages.innerHTML += '<div><strong>Connected to WebSocket</strong></div>';
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'chunk') {
+                    messages.innerHTML += '<span>' + data.data + '</span>';
+                } else if (data.type === 'end') {
+                    messages.innerHTML += '<div><strong>--- End of Response ---</strong></div>';
+                } else if (data.error) {
+                    messages.innerHTML += '<div style="color: red;"><strong>Error:</strong> ' + data.error + '</div>';
+                }
+                messages.scrollTop = messages.scrollHeight;
+            };
+
+            ws.onclose = function(event) {
+                status.textContent = 'Disconnected';
+                status.style.color = 'red';
+                messages.innerHTML += '<div><strong>Disconnected from WebSocket</strong></div>';
+            };
+
+            ws.onerror = function(error) {
+                status.textContent = 'Error';
+                status.style.color = 'red';
+                messages.innerHTML += '<div style="color: red;"><strong>WebSocket Error:</strong> ' + error + '</div>';
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function sendQuery() {
+            const query = document.getElementById('queryInput').value;
+            if (ws && ws.readyState === WebSocket.OPEN && query) {
+                messages.innerHTML += '<div><strong>Query:</strong> ' + query + '</div>';
+                ws.send(JSON.stringify({query: query}));
+                document.getElementById('queryInput').value = '';
+            } else {
+                alert('Please connect to WebSocket first and enter a query');
+            }
+        }
+
+        document.getElementById('queryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendQuery();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -27,6 +27,7 @@ const HOST_HEADER = Deno.env.get("HOST_HEADER") || "localhost";
 // Configure CORS middleware
 const allowedOrigins = [
   `${HOST_HEADER}`,
+  'http://localhost:5173',
   Deno.env.get("VITE_BASE_URL")
 ].filter(Boolean);
 

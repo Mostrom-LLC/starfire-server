@@ -22,7 +22,9 @@ dotenv.config();
 const { app } = expressWs(express());
 const PORT = parseInt(Deno.env.get("PORT") || "8000");
 const HOST_HEADER = Deno.env.get("HOST_HEADER") || "localhost";
-
+// Determine if we should use secure protocol based on environment
+const USE_HTTPS = Deno.env.get("USE_HTTPS") === "true" || HOST_HEADER.includes("https://");
+const WS_PROTOCOL = USE_HTTPS ? "wss" : "ws";
 
 // Configure CORS middleware
 const allowedOrigins = [
@@ -76,7 +78,7 @@ app.get("/", (_req: Request, res: Response) => {
     message: "Knowledge Base API is running",
     documentation: "/api-docs",
     endpoints: {
-      "websocket-v1": "ws://localhost:8000/ws/query (LangChain + DynamoDB + WebSocket streaming)",
+      "websocket-v1": `${WS_PROTOCOL}://${HOST_HEADER}/ws/query (LangChain + DynamoDB + WebSocket streaming)`,
       "ingestion": "POST /api/ingest (File upload, analysis & storage), GET /api/ingest (List files)",
       "visualization": "POST /api/visualize (Generate chart data and insights), GET /api/visualize/topics (Get available topics)"
     }
@@ -92,7 +94,6 @@ app.use(visualizationRouter);
 
 // Setup WebSocket routes
 setupWebSocketRoutes(app);
-
 
 // OpenAPI configuration
 const openApiSpec = {
@@ -201,5 +202,5 @@ globalThis.addEventListener("error", (e) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${HOST_HEADER}`);
   console.log(`📚 API Documentation: ${HOST_HEADER}/api-docs`);
-  console.log(`🔌 WebSocket v3: ws://${HOST_HEADER}/ws/query`);
+  console.log(`🔌 WebSocket v3: ${WS_PROTOCOL}://${HOST_HEADER}/ws/query`);
 });

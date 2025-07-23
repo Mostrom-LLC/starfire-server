@@ -63,19 +63,23 @@ deno task start
 ### API Endpoints
 
 #### Health and Status
+
 - **GET /healthcheck** - Health check endpoint
 - **GET /api/status** - API status information
 - **GET /api-docs** - Interactive Scalar API documentation
 - **GET /api-docs/json** - OpenAPI specification
 
 #### Knowledge Base Querying
+
 - **WS /ws/query** - WebSocket endpoint for streaming knowledge base queries
 
 #### Data Ingestion
+
 - **POST /api/ingest** - Upload and analyze files (stores in S3 and DynamoDB)
 - **GET /api/ingest** - Fetch paginated list of ingested files with support for page-based pagination
 
 #### Visualization
+
 - **POST /api/visualize/generate** - Generate multiple visualizations from knowledge base data
 - **GET /api/visualize** - List all visualization sets
 - **GET /api/visualize/:id** - Get a specific visualization set
@@ -211,10 +215,11 @@ You'll receive streaming responses in real-time as individual text chunks:
 **Important**: The stream is completed when you receive the end signal:
 
 ```json
-{"type": "end"}
+{ "type": "end" }
 ```
 
 **How to detect when streaming is complete:**
+
 - Listen for messages with `type: "end"`
 - This indicates the AI has finished generating the response
 - No more chunks will be sent after this message
@@ -259,7 +264,6 @@ For a query like `{"query": "What are geographic regions where drug utilization 
 ```
 
 **Note**: The `{"type": "end"}` message is **always** sent at the end of every response to signal completion.
-
 
 ## Testing
 
@@ -314,3 +318,4 @@ All dependencies are managed through Deno's import map in `deno.json`:
 - Efficient memory usage with Deno's modern runtime
 - Minimal dependencies with tree-shaking
 - Native TypeScript compilation
+- Test

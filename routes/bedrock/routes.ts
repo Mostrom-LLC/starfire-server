@@ -9,7 +9,7 @@ import { ChatBedrockConverse } from "@langchain/aws";
 import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
 import { createHistoryAwareRetriever } from "langchain/chains/history_aware_retriever";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
-
+import { BaseMessage } from "@langchain/core/messages";
 import { Document } from "@langchain/core/documents";
 
 // Environment variables
@@ -135,8 +135,15 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
         const retrievalStartTime = Date.now();
 
         // Step 1: Get chat history and create context-aware query
-        const messages = await chatHistory.getMessages();
-        console.log(`📚 [v3] Retrieved ${messages.length} previous messages from DynamoDB`);
+        let messages: BaseMessage[];
+        try {
+          messages = await chatHistory.getMessages();
+          console.log(`📚 [v3] Retrieved ${messages.length} previous messages from DynamoDB`);
+        } catch (_error) {
+          // Handle new chat sessions - no history exists yet
+          console.log(`📝 [v3] New chat session - initializing empty history`);
+          messages = [];
+        }
 
         const historyAwareQuery = await historyAwareRetriever.invoke({
           input: query,

@@ -10,7 +10,9 @@ import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
 import { createHistoryAwareRetriever } from "langchain/chains/history_aware_retriever";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { BaseMessage } from "@langchain/core/messages";
+import { BaseMessage } from "@langchain/core/messages";
 import { Document } from "@langchain/core/documents";
+import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
 
 // Environment variables
 const awsRegion = Deno.env.get("AWS_REGION") || "us-east-1";
@@ -25,7 +27,151 @@ const bedrockClient = new BedrockAgentRuntimeClient({
   region: awsRegion,
 });
 
+// Initialize DynamoDB client
+const dynamoDBClient = new DynamoDBClient({
+  region: awsRegion,
+});
 
+// REST endpoint to get all chat sessions
+router.get("/chats", async (req, res) => {
+  try {
+    // Parse pagination parameters
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100); // Default 20, max 100
+    const exclusiveStartKey = req.query.cursor as string;
+
+    console.log(`📋 Fetching chat sessions from DynamoDB table: ${dynamodbChatsTable} (limit: ${limit})`);
+
+    // Scan the DynamoDB table with pagination
+    const scanParams: any = {
+      TableName: dynamodbChatsTable,
+      Limit: limit * 3 // Get more items to account for grouping by sessionId
+    };
+
+    // Add cursor for pagination if provided
+    if (exclusiveStartKey) {
+      try {
+        scanParams.ExclusiveStartKey = JSON.parse(atob(exclusiveStartKey));
+      } catch (_error) {
+        return res.status(400).json({ error: "Invalid cursor parameter" });
+      }
+    }
+
+    const scanCommand = new ScanCommand(scanParams);
+
+    const response = await dynamoDBClient.send(scanCommand);
+
+    // Group messages by session ID and get the latest timestamp for each
+    const sessionsMap = new Map();
+
+    if (response.Items) {
+      for (const item of response.Items) {
+        const sessionId = item.id?.S;
+        const timestamp = item.timestamp?.N ? parseInt(item.timestamp.N) : 0;
+
+        if (sessionId) {
+          const existing = sessionsMap.get(sessionId);
+          if (!existing || timestamp > existing.lastActivity) {
+            sessionsMap.set(sessionId, {
+              sessionId,
+              lastActivity: timestamp,
+              messageCount: (existing?.messageCount || 0) + 1
+            });
+          } else if (existing) {
+            existing.messageCount++;
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by last activity
+    const allSessions = Array.from(sessionsMap.values()).sort((a, b) => b.lastActivity - a.lastActivity);
+
+    // Apply limit to sessions and prepare response
+    const sessions = allSessions.slice(0, limit);
+    const hasMore = allSessions.length > limit || !!response.LastEvaluatedKey;
+
+    // Create cursor for next page if there are more results
+    let nextCursor: string | undefined;
+    if (hasMore && response.LastEvaluatedKey) {
+      nextCursor = btoa(JSON.stringify(response.LastEvaluatedKey));
+    }
+
+    console.log(`✅ Found ${sessions.length} chat sessions (total scanned: ${allSessions.length})`);
+
+    const responseData: any = {
+      sessions,
+      pagination: {
+        limit,
+        hasMore,
+        total: allSessions.length
+      }
+    };
+
+    if (nextCursor) {
+      responseData.pagination.nextCursor = nextCursor;
+    }
+
+    res.json(responseData);
+
+  } catch (error) {
+    console.error("❌ Error fetching chat sessions:", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to fetch chat sessions"
+    });
+  }
+});
+
+// REST endpoint to get chat history for a specific session
+router.get("/chats/:sessionId", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    console.log(`📖 Fetching chat history for session: ${sessionId}`);
+
+    // Create a new chat history instance for the session
+    const chatHistory = new DynamoDBChatMessageHistory({
+      tableName: dynamodbChatsTable,
+      partitionKey: "SessionId",
+      sessionId: sessionId,
+      config: {
+        region: awsRegion,
+      },
+    });
+
+    // Get messages for the session
+    let messages: BaseMessage[] = [];
+    try {
+      messages = await chatHistory.getMessages();
+      console.log(`✅ Retrieved ${messages.length} messages for session ${sessionId}`);
+    } catch (error) {
+      if (error instanceof Error && error.message?.includes('Requested resource not found')) {
+        console.log(`ℹ️ Session ${sessionId} not found or has no messages`);
+        // Return empty array for non-existent sessions
+        messages = [];
+      } else {
+        throw error;
+      }
+    }
+
+    // Format messages for response
+    const formattedMessages = messages.map(msg => ({
+      type: msg._getType(),
+      content: msg.content,
+      timestamp: msg.additional_kwargs?.timestamp || null,
+    }));
+
+    res.json({
+      sessionId,
+      messages: formattedMessages,
+      totalMessages: formattedMessages.length
+    });
+
+  } catch (error) {
+    console.error(`❌ Error fetching chat history for session ${req.params.sessionId}:`, error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to fetch chat history"
+    });
+  }
+});
 
 // Function to setup WebSocket routes on the main app
 export const setupWebSocketRoutes = (app: Application & { ws: (path: string, handler: (ws: WebSocket, req: Request) => void) => void }) => {
@@ -139,10 +285,15 @@ export const setupWebSocketRoutes = (app: Application & { ws: (path: string, han
         try {
           messages = await chatHistory.getMessages();
           console.log(`📚 [v3] Retrieved ${messages.length} previous messages from DynamoDB`);
-        } catch (_error) {
-          // Handle new chat sessions - no history exists yet
-          console.log(`📝 [v3] New chat session - initializing empty history`);
-          messages = [];
+        } catch (error) {
+          // If session doesn't exist yet, initialize with empty message history
+          if (error instanceof Error && error.message?.includes('Requested resource not found')) {
+            console.log(`🆕 [v3] Session ${sessionId} doesn't exist yet, initializing with empty history`);
+            messages = [];
+          } else {
+            // Re-throw if it's a different error
+            throw error;
+          }
         }
 
         const historyAwareQuery = await historyAwareRetriever.invoke({

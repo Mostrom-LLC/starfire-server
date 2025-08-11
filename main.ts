@@ -79,6 +79,7 @@ app.get("/", (_req: Request, res: Response) => {
     documentation: "/api-docs",
     endpoints: {
       "websocket-v1": `${WS_PROTOCOL}://${HOST_HEADER}/ws/query (LangChain + DynamoDB + WebSocket streaming)`,
+      "chats": "GET /chats (List all chat sessions), GET /chats/:sessionId (Get specific chat history)",
       "ingestion": "POST /api/ingest (File upload, analysis & storage), GET /api/ingest (List files)",
       "visualization": "POST /api/visualize (Generate chart data and insights), GET /api/visualize/topics (Get available topics)"
     }

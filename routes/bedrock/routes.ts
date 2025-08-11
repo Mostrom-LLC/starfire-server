@@ -10,7 +10,6 @@ import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
 import { createHistoryAwareRetriever } from "langchain/chains/history_aware_retriever";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { BaseMessage } from "@langchain/core/messages";
-import { BaseMessage } from "@langchain/core/messages";
 import { Document } from "@langchain/core/documents";
 import { DynamoDBClient, ScanCommand } from "@aws-sdk/client-dynamodb";
 
